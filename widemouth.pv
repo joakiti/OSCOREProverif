@@ -1,0 +1,33 @@
+
+
+free c:channel.
+
+type key.
+type timeStamp.
+type actor.
+
+fun k(actor, actor) : key[private].
+
+fun senc(bitstring, key): bitstring.
+reduc forall m: bitstring, xk:key; sdec(senc(m,xk),xk) = m.
+
+fun msg(timeStamp, actor, key):bitstring[data].
+
+let processA(A: actor, S: actor, B: actor) =
+  new Ta : timeStamp;
+  new kAB : key;
+  out(c, (A, (senc(msg(Ta,B, kAB),k(A,S)))))
+  .
+let processS(S: actor, A:actor) =
+  new Ts : timeStamp;
+  in(c, as:bitstring);
+  let msg(Ta:timeStamp, B:actor, kAB:key) = sdec(as,k(A,S)) in
+  out(c, senc(msg(Ts,A,kAB),k(B,S)))
+  .
+
+query attacker(new kAB).
+
+process
+  new A: actor; new S: actor; new B: actor; new I: actor;
+  out(c, (A,S,B,I, k(I,S)));
+  ( (in(c, B': actor); processA(A,S,B')) | processS(S,A) )

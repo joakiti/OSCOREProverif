@@ -1,0 +1,62 @@
+free c: channel.
+(*******************)
+(* Everything COAP *)
+(*******************)
+type CoAP_request.
+type CoAP_header.
+
+type CoAP_version.
+fun CoAP_versionOne(): CoAP_version.
+type CoAP_confirmCode.
+fun CoAP_confirmable(): CoAP_confirmCode.
+fun CoAP_nonConfirm(): CoAP_confirmCode.
+type CoAP_tokenlength.
+fun CoAP_expectedLength(): CoAP_tokenlength.
+type CoAP_requestCode.
+type CoAP_messageID.
+
+(*CoAP body begin*)
+type CoAP_token.
+type CoAP_options.
+type CoAP_option.
+type CoAP_payload.
+
+fun createHeader(CoAP_version, CoAP_confirmCode, CoAP_tokenlength, CoAP_requestCode, CoAP_messageID) : CoAP_header.
+fun createRequest(CoAP_header, CoAP_token, CoAP_option, CoAP_payload) : CoAP_request.
+
+(*******************)
+(*Security Contexts*)
+(*******************)
+
+type sender_context.
+type sender_id.
+type oscore_key.
+
+fun getSenderContext(sender_id) : sender_context.
+fun getSenderKey(sender_context) : oscore_key.
+
+(********************************************)
+(* AEAD - Encryption and authenticated data *)
+(********************************************)
+type oscore_version.
+type aead_algorithm.
+type request_kid.
+type request_piv.
+
+type additional_data.
+fun AAD(oscore_version, aead_algorithm, request_kid, request_piv, CoAP_option) : additional_data.
+
+type ptext.
+fun plaintext() : ptext.
+
+type sender_sequence_number.
+
+let request_sender =
+  let version = CoAP_versionOne();
+  let confirm = CoAP_nonConfirm();
+
+
+let oscore_princial =
+  0.
+process
+  (!oscore_princial) | (!oscore_princial)

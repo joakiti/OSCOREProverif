@@ -1,0 +1,117 @@
+free c: channel.
+
+type pkey.
+type skey.
+
+fun pk(skey): pkey.
+fun aenc(bitstring, pkey): bitstring.
+
+reduc forall x: bitstring, k:skey; adec(aenc(x,pk(k)),k) = x.
+
+type spkey.
+type sskey.
+
+fun spk(sskey): spkey.
+fun sign(bitstring, sskey): bitstring.
+
+reduc forall x: bitstring, y: sskey; getmess(sign(x,y)) = x.
+reduc forall x: bitstring, y: sskey; checksign(sign(x,y), spk(y)) = x.
+
+(* Shared key encryption *)
+type nonce.
+fun senc(bitstring, nonce): bitstring.
+reduc forall x: bitstring, y: nonce; sdec(senc(x,y), y) = x.
+
+fun nonce_to_bitstring(nonce): bitstring[data, typeConverter].
+(* Declare 2 honest hosts *)
+type host.
+free A, B: host.
+
+(* Key table *)
+table keys(host, pkey).
+
+event beginAparam(host).
+event endAparam(host).
+event beginBparam(host).
+event endBparam(host).
+
+query x: host; inj-event(endBparam(x)) ==> inj-event(beginBparam(x)).
+query x: host; inj-event(endAparam(x)) ==> inj-event(beginAparam(x)).
+
+free secretANa, secretANb, secretBNa, secretBNb: bitstring[private].
+
+query attacker(secretANa);
+      attacker(secretANb);
+      attacker(secretBNa);
+      attacker(secretBNb).
+
+let processA(pkS: spkey, skA: skey, skB: skey) =
+  in(c, hostX: host); (*We denote that the process is willing to complete protocol with any host.*)
+
+  event beginBparam(hostX); (*Begin event that some host has been accepted, possibly B.*)
+  out(c, (A, hostX)); (*MESSAGE 1*)
+
+  in(c, ms: bitstring); (*Receive the public key of hostX, and identity from server, MESSAGE 2*)
+  let (pkX: pkey, =hostX) = checksign(ms, pkS) in (*Use checksign to verify the server*)
+
+  new Na: nonce; (* Generate the nonce to send to hostX*)
+  out(c, aenc((Na, A), pkX)); (*Send nonce to hostX encrypted with his public key, MESSAGE 3 *)
+
+  in(c, ms6: bitstring);
+  let (=Na, NX: nonce) = adec(ms6, skA) in
+
+  out(c, aenc(nonce_to_bitstring(NX), pkX)); (* Send message to hostX that we decrypted his nonce*)
+  if hostX = B then
+  event endAparam(A);
+  out(c, senc(secretANa, Na));
+  out(c, senc(secretANb, NX)).
+
+let processB(pkS: spkey, skA: skey, skB: skey) =
+
+  in(c, ms3: bitstring); (*Receive nonce from A, MESSAGE 3*)
+  let (NY:nonce, hostY: host) = adec(ms3, skB) in (*Receive the host here, and a nonce.*)
+
+  event beginAparam(hostY); (*Event that protocol started in processB *)
+  out(c, (B, hostY)); (*Ask for the public key from server, MESSAGE 4 *)
+
+  in (c, ms5: bitstring); (* Receive public key from server, MESSAGE 5 *)
+  let(pkeyY: pkey, =hostY) = checksign(ms5, pkS) in (* Verify the message, get public key*)
+
+  new Nb: nonce;
+  out(c, aenc((NY, Nb), pkeyY)); (*Transmit message that verifies that B could decrypt Y's message, MESSAGE 6*)
+
+  in(c, ms7: bitstring);
+  if nonce_to_bitstring(Nb) = adec(ms7, skB) then
+  if hostY = A then
+  event endBparam(B);
+  out(c, senc(secretBNa, NY));
+  out(c, senc(secretBNb, Nb)).(* Magic *)
+
+let processS(skS: sskey) =
+  in(c, (a: host, b: host));
+  get keys(=b, sb) in (* Look up keys table get key for host *)
+  out(c, sign((sb,b), skS)). (* Transmit key on channel c *)
+
+(* Key registration process (?)*)
+let processK =
+  in(c, (h: host, k: pkey));
+  if h <> A && h <> B then insert keys(h,k).
+
+process
+  (*Setup host A*)
+  new skA: skey;
+  let pkA = pk(skA) in out(c, pkA);
+  insert keys(A, pkA);
+  (*Setup host B*)
+  new skB: skey;
+  let pkB = pk(skB) in out(c, pkB);
+  insert keys(B, pkB);
+  (*Setup server*)
+  new skS: sskey;
+  let pkS = spk(skS) in out(c, pkS);
+  (
+    (!processA(pkS, skA, skB)) |(*Run process A*)
+    (!processB(pkS, skA, skB)) |(*Run process B*)
+    (!processS(skS)) |          (*Run honest server*)
+    (!processK)                 (*Key inserting process*)
+     )

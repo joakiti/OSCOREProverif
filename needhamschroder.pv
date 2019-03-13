@@ -1,0 +1,40 @@
+
+type nonce.
+type role.
+type pkey.
+type skey.
+
+free c:channel.
+fun pk(role) : pkey.
+fun sk(role): skey [private].
+fun aenc(bitstring, pkey): bitstring.
+reduc forall m: bitstring, a: role; adec(aenc(m,pk(a)),sk(a)) = m.
+
+fun msg1(role, nonce): bitstring[data].
+fun msg2(nonce, nonce):bitstring[data].
+fun msg3(nonce):bitstring[data].
+
+let processA(A: role, B: role) =
+  new nA: nonce;
+  out(c, aenc((A, nA), pk(B)));
+  in(c, x:bitstring);
+  let msg2(xnA: nonce, nB: nonce) = adec(x, sk(A)) in
+  if xnA = nA then
+  out(c, aenc(nB, pk(B))).
+
+let processB(B: role) =
+  new nB: nonce;
+  in(c, y:bitstring);
+  let msg1(A: role, xnA: nonce) = adec(y, sk(B)) in
+  out(c, aenc((xnA, nB), pb(A)));
+  in(c, z:bitstring);
+  let msg3(xnB: nonce) = adec(y, sk(B)) in
+  if nB = xnB
+  then 0.
+
+process
+  new a: role; new b: role; new i: role;
+  out(c, (a,b,i,sk(i)));
+  (
+    processA(a,b) | processB(b)
+  )

@@ -1,0 +1,17 @@
+type key.
+
+fun s enc(bitstring, key) : bitstring.
+
+(* Modelling the decryption function symmetricly *)
+reduc forall m: bitstring, k:key; sdec(senc(m,k),k) = m.
+
+(* Asymmetric*)
+
+type skey.
+type pkey.
+fun pk(skey) : pkey.
+fun aenc (bitstring, pkey ) : bitstring.
+reduc forall m: bitstring, k:skey; adec(aenc(m,pk(k)),k) = m.
+
+
+//adec ( aenc (m, pk ( k ) ) , k ) = m.
