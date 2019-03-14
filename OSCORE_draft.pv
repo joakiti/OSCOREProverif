@@ -1,28 +1,34 @@
 free c: channel.
+free requestChannel:channel[private].
 (*******************)
 (* Everything COAP *)
 (*******************)
-type CoAP_request.
-type CoAP_header.
+type CoAP_request[data].
+type CoAP_header[data].
 
-type CoAP_version.
+type CoAP_version[data].
 fun CoAP_versionOne(): CoAP_version.
-type CoAP_confirmCode.
+type CoAP_confirmCode[data].
 fun CoAP_confirmable(): CoAP_confirmCode.
 fun CoAP_nonConfirm(): CoAP_confirmCode.
-type CoAP_tokenlength.
+type CoAP_tokenlength[data].
 fun CoAP_expectedLength(): CoAP_tokenlength.
-type CoAP_requestCode.
-type CoAP_messageID.
+type CoAP_requestCode[data].
+fun CoAP_GETCode(): CoAP_requestCode.
+fun CoAP_CHANGEDCode(): CoAP_requestCode.
+type CoAP_messageID[data].
 
 (*CoAP body begin*)
-type CoAP_token.
-type CoAP_options.
-type CoAP_option.
-type CoAP_payload.
+type CoAP_token[data].
+type CoAP_options[data].
+type CoAP_option[data].
+fun CoAP_OSCORE_Option() : CoAP_option.
+type CoAP_payload[data].
+type CoAP_payload_encryted[data].
+fun CoAP_encryptPayload() : CoAP_payload.
 
 fun createHeader(CoAP_version, CoAP_confirmCode, CoAP_tokenlength, CoAP_requestCode, CoAP_messageID) : CoAP_header.
-fun createRequest(CoAP_header, CoAP_token, CoAP_option, CoAP_payload) : CoAP_request.
+fun createRequest(CoAP_header, CoAP_token, CoAP_option, CoAP_payload) : CoAP_request[data].
 
 (*******************)
 (*Security Contexts*)
@@ -51,12 +57,28 @@ fun plaintext() : ptext.
 
 type sender_sequence_number.
 
-let request_sender =
-  let version = CoAP_versionOne();
-  let confirm = CoAP_nonConfirm();
 
+event here.
+query event(here).
+let request_sender =
+  let version = CoAP_versionOne() in
+  let confirm = CoAP_nonConfirm() in
+  let tlength = CoAP_expectedLength() in
+  let dummyCode = CoAP_GETCode() in
+  new messageID : CoAP_messageID;
+  let header = createHeader(version, confirm, tlength, dummyCode, messageID) in
+  new token : CoAP_token;
+  let oscore_option = CoAP_OSCORE_Option() in
+  new payload : CoAP_payload;
+  let request = createRequest(header, token, oscore_option, payload) in
+  out(requestChannel, request).
 
 let oscore_princial =
-  0.
+  in(requestChannel, req: CoAP_request);
+  event here;
+  out(c, req).
+
+query attacker(new req).
+
 process
-  (!oscore_princial) | (!oscore_princial)
+  (!oscore_princial) | (!oscore_princial) | (!request_sender)
