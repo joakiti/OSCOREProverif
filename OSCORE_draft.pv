@@ -1,5 +1,5 @@
 free c: channel.
-free requestChannel:channel[private].
+free secureChannel:channel[private].
 (*******************)
 (* Everything COAP *)
 (*******************)
@@ -33,9 +33,11 @@ fun createRequest(CoAP_header, CoAP_token, CoAP_option, CoAP_payload) : CoAP_req
 (*******************)
 (*Security Contexts*)
 (*******************)
-
+type sender_sequence_number.
 type sender_context.
 type sender_id.
+type iv.
+fun partial_iv(sender_sequence_number): iv.
 type oscore_key.
 
 fun getSenderContext(sender_id) : sender_context.
@@ -46,20 +48,36 @@ fun getSenderKey(sender_context) : oscore_key.
 (********************************************)
 type oscore_version.
 type aead_algorithm.
-type request_kid.
-type request_piv.
+type nonce.
 
 type additional_data.
-fun AAD(oscore_version, aead_algorithm, request_kid, request_piv, CoAP_option) : additional_data.
-
+fun AAD(oscore_version, aead_algorithm, sender_id, iv, CoAP_option) : additional_data.
+fun aead_nonce(sender_id, iv, iv) : nonce.
 type ptext.
 fun plaintext() : ptext.
+(*********************************************)
+(*                    COSE                   *)
+(*********************************************)
 
-type sender_sequence_number.
+type COSE.
+type COSE_ciphertext.
+fun enc_COSE_ciphertext(oscore_key, nonce, ptext, additional_data): COSE_ciphertext.
+reduc forall k:oscore_key, n:nonce, plain: ptext, add:additional_data; dec_COSE_ciphertext(enc_COSE_ciphertext(k,n,plain,add), k, n, add) = plain.
+fun createCOSE(iv, sender_id, COSE_ciphertext) : COSE.
+(* No model of the protected data - it's always empty*)
+(* IV and Sender_ID are contained in the unprotected field*)
+(* COSE_ciphertext is the ciphertext field*)
 
 
 event here.
 query event(here).
+
+
+(*CHANGE THIS TO BE MORE GENERIC*)
+free common_iv:iv[private].
+free sid:sender_id[private].
+free agreed_sender_sequence_number:sender_sequence_number[private].
+
 let request_sender =
   let version = CoAP_versionOne() in
   let confirm = CoAP_nonConfirm() in
@@ -71,14 +89,17 @@ let request_sender =
   let oscore_option = CoAP_OSCORE_Option() in
   new payload : CoAP_payload;
   let request = createRequest(header, token, oscore_option, payload) in
-  out(requestChannel, request).
+  out(secureChannel, request).
 
 let oscore_princial =
-  in(requestChannel, req: CoAP_request);
+  in(secureChannel, req: CoAP_request);
+  new add: additional_data;
+  new plain: ptext;
+  let nonce = aead_nonce(sid, common_iv, partial_iv(agreed_sender_sequence_number)) in
   event here;
   out(c, req).
 
-query attacker(new req).
+query attacker(new payload).
 
 process
   (!oscore_princial) | (!oscore_princial) | (!request_sender)
