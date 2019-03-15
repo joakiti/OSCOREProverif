@@ -27,7 +27,7 @@ type CoAP_payload[data].
 type CoAP_payload_encryted[data].
 fun CoAP_encryptPayload() : CoAP_payload.
 
-fun createHeader(CoAP_version, CoAP_confirmCode, CoAP_tokenlength, CoAP_requestCode, CoAP_messageID) : CoAP_header.
+fun createHeader(CoAP_version, CoAP_confirmCode, CoAP_tokenlength, CoAP_requestCode, CoAP_messageID) : CoAP_header[data].
 fun createRequest(CoAP_header, CoAP_token, CoAP_option, CoAP_payload) : CoAP_request[data].
 
 (*******************)
@@ -54,7 +54,7 @@ type additional_data.
 fun AAD(oscore_version, aead_algorithm, sender_id, iv, CoAP_option) : additional_data.
 fun aead_nonce(sender_id, iv, iv) : nonce.
 type ptext.
-fun plaintext() : ptext.
+fun plaintext(CoAP_requestCode, CoAP_payload) : ptext.
 (*********************************************)
 (*                    COSE                   *)
 (*********************************************)
@@ -76,6 +76,8 @@ query event(here).
 (*CHANGE THIS TO BE MORE GENERIC*)
 free common_iv:iv[private].
 free sid:sender_id[private].
+free sender_key:oscore_key[private].
+fun recipient_key(oscore_key):oscore_key.
 free agreed_sender_sequence_number:sender_sequence_number[private].
 
 let request_sender =
@@ -93,13 +95,16 @@ let request_sender =
 
 let oscore_princial =
   in(secureChannel, req: CoAP_request);
+  let (header:CoAP_header, token:CoAP_token, OSCORE:CoAP_option, payload:CoAP_payload) = req in
   new add: additional_data;
-  new plain: ptext;
-  let nonce = aead_nonce(sid, common_iv, partial_iv(agreed_sender_sequence_number)) in
+  new secret_plaintext: ptext;
+  let aeadnonce = aead_nonce(sid, common_iv, partial_iv(agreed_sender_sequence_number)) in
+  let ciphertext = enc_COSE_ciphertext(sender_key, aeadnonce, secret_plaintext, add) in
+  let COSE = createCOSE(partial_iv(agreed_sender_sequence_number), sid, ciphertext) in
   event here;
-  out(c, req).
+  out(c, COSE).
 
-query attacker(new payload).
+query attacker(new secret_plaintext).
 
 process
   (!oscore_princial) | (!oscore_princial) | (!request_sender)
