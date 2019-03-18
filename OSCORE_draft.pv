@@ -72,9 +72,12 @@ fun plaintext(CoAP_requestCode, CoAP_payload) : ptext.
 type COSE.
 type COSE_ciphertext.
 fun enc_COSE_ciphertext(oscore_key, nonce, ptext, additional_data): COSE_ciphertext.
+fun payload_from_ciphertext(COSE_ciphertext):CoAP_payload.
 reduc forall k:oscore_key, n:nonce, plain: ptext, add:additional_data; dec_COSE_ciphertext(enc_COSE_ciphertext(k,n,plain,add), k, n, add) = plain.
 fun createCOSE(iv, sender_id, COSE_ciphertext) : COSE.
 reduc forall partialiv: iv, kid:sender_id, ciphertex: COSE_ciphertext; getUnprotected(createCOSE(partialiv,kid,ciphertex)) = (partialiv,kid).
+reduc forall partialiv: iv, kid:sender_id, ciphertex: COSE_ciphertext; getCiphertext(createCOSE(partialiv,kid,ciphertex)) = ciphertex.
+
 (* No model of the protected data - it's always empty*)
 (* IV and Sender_ID are contained in the unprotected field*)
 (* COSE_ciphertext is the ciphertext field*)
@@ -111,8 +114,8 @@ let request_sender =
 let oscore_princial =
   in(secureChannel, req: CoAP_request);
   (*Decode the received message from "TLS" *)
-  let (header:CoAP_header, token:CoAP_token, option:CoAP_option, payload:CoAP_payload) = destructR(req) in
-  let (version:CoAP_version, confirmCode: CoAP_confirmCode, tlength: CoAP_tokenlength, requestCode: CoAP_requestCode, messageId: CoAP_messageID) = destructH(header) in
+  let (reqheader:CoAP_header, token:CoAP_token, option:CoAP_option, payload:CoAP_payload) = destructR(req) in
+  let (version:CoAP_version, confirmCode: CoAP_confirmCode, tlength: CoAP_tokenlength, requestCode: CoAP_requestCode, messageId: CoAP_messageID) = destructH(reqheader) in
 
   (*Generate additation authenticated data. No options that should be integrity protected for now*)
   let aad = AAD(oscore_version_one(), default_aead_algorithm(), sid, partial_iv(agreed_sender_sequence_number)) in
@@ -131,11 +134,12 @@ let oscore_princial =
   let COSEobject = createCOSE(partial_iv(agreed_sender_sequence_number), sid, ciphertext) in
 
   let (partialiv:sender_sequence_number, kid: sender_id) = getUnprotected(COSEobject) in
+  let ciphertex : COSE_ciphertext = getCiphertext(COSEobject) in
   let OSCORE_OPTION = CoAP_OSCORE_Option(partialiv,kid) in
   let dummyCode = CoAP_GETCode() in
   (*We are ready to send an OSCORE request*)
   let header = createHeader(version, confirmCode, tlength, dummyCode, messageId) in
-  let request = createRequest(header, token, OSCORE_OPTION, payload) in
+  let request = createRequest(header, token, OSCORE_OPTION, payload_from_ciphertext(ciphertex)) in
   out(c, request).
 
 query attacker (new rcode).
