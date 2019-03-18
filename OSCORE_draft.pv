@@ -15,6 +15,7 @@ type CoAP_tokenlength[data].
 fun CoAP_expectedLength(): CoAP_tokenlength.
 type CoAP_requestCode[data].
 fun CoAP_GETCode(): CoAP_requestCode.
+fun CoAP_POSTCode(): CoAP_requestCode.
 fun CoAP_CHANGEDCode(): CoAP_requestCode.
 type CoAP_messageID[data].
 
@@ -22,13 +23,15 @@ type CoAP_messageID[data].
 type CoAP_token[data].
 type CoAP_options[data].
 type CoAP_option[data].
-fun CoAP_OSCORE_Option() : CoAP_option.
 type CoAP_payload[data].
-type CoAP_payload_encryted[data].
-fun CoAP_encryptPayload() : CoAP_payload.
-
+fun payload_fromId(CoAP_messageID) : CoAP_payload.
 fun createHeader(CoAP_version, CoAP_confirmCode, CoAP_tokenlength, CoAP_requestCode, CoAP_messageID) : CoAP_header[data].
+reduc forall cv:CoAP_version, cc:CoAP_confirmCode, ctl:CoAP_tokenlength, crc:CoAP_requestCode, cmid:CoAP_messageID; destructH(createHeader(cv,cc,ctl,crc,cmid)) = (cv,cc,ctl,crc,cmid).
 fun createRequest(CoAP_header, CoAP_token, CoAP_option, CoAP_payload) : CoAP_request[data].
+reduc forall ch: CoAP_header, ct:CoAP_token, co:CoAP_option, cp:CoAP_payload; destructR(createRequest(ch,ct,co,cp)) = (ch,ct,co,cp).
+(*******************)
+(*    OSCORE       *)
+(*******************)
 
 (*******************)
 (*Security Contexts*)
@@ -36,6 +39,8 @@ fun createRequest(CoAP_header, CoAP_token, CoAP_option, CoAP_payload) : CoAP_req
 type sender_sequence_number.
 type sender_context.
 type sender_id.
+fun CoAP_OSCORE_Option(sender_sequence_number, sender_id) : CoAP_option.
+fun CoAP_EmptyOption(): CoAP_option.
 type iv.
 fun partial_iv(sender_sequence_number): iv.
 type oscore_key.
@@ -47,11 +52,16 @@ fun getSenderKey(sender_context) : oscore_key.
 (* AEAD - Encryption and authenticated data *)
 (********************************************)
 type oscore_version.
+fun oscore_version_one() : oscore_version.
 type aead_algorithm.
+fun default_aead_algorithm(): aead_algorithm.
 type nonce.
 
 type additional_data.
-fun AAD(oscore_version, aead_algorithm, sender_id, iv, CoAP_option) : additional_data.
+(*AAD with CoAP Option*)
+fun AADwOption(oscore_version, aead_algorithm, sender_id, iv, CoAP_option) : additional_data.
+(*AAD with no integrity protected options*)
+fun AAD(oscore_version, aead_algorithm, sender_id, iv) : additional_data.
 fun aead_nonce(sender_id, iv, iv) : nonce.
 type ptext.
 fun plaintext(CoAP_requestCode, CoAP_payload) : ptext.
@@ -64,6 +74,7 @@ type COSE_ciphertext.
 fun enc_COSE_ciphertext(oscore_key, nonce, ptext, additional_data): COSE_ciphertext.
 reduc forall k:oscore_key, n:nonce, plain: ptext, add:additional_data; dec_COSE_ciphertext(enc_COSE_ciphertext(k,n,plain,add), k, n, add) = plain.
 fun createCOSE(iv, sender_id, COSE_ciphertext) : COSE.
+reduc forall partialiv: iv, kid:sender_id, ciphertex: COSE_ciphertext; getUnprotected(createCOSE(partialiv,kid,ciphertex)) = (partialiv,kid).
 (* No model of the protected data - it's always empty*)
 (* IV and Sender_ID are contained in the unprotected field*)
 (* COSE_ciphertext is the ciphertext field*)
@@ -81,30 +92,52 @@ fun recipient_key(oscore_key):oscore_key.
 free agreed_sender_sequence_number:sender_sequence_number[private].
 
 let request_sender =
+(*HEADER*)
   let version = CoAP_versionOne() in
   let confirm = CoAP_nonConfirm() in
   let tlength = CoAP_expectedLength() in
-  let dummyCode = CoAP_GETCode() in
+  new rcode : CoAP_requestCode;
   new messageID : CoAP_messageID;
-  let header = createHeader(version, confirm, tlength, dummyCode, messageID) in
+  let header = createHeader(version, confirm, tlength, rcode, messageID) in
+(*HEADER END*)
+(*BODY*)
   new token : CoAP_token;
-  let oscore_option = CoAP_OSCORE_Option() in
-  new payload : CoAP_payload;
-  let request = createRequest(header, token, oscore_option, payload) in
+  let payload = payload_fromId(messageID) in
+(*BODY*)
+(*Assemble request and send*)
+  let request = createRequest(header, token, CoAP_EmptyOption(), payload) in
   out(secureChannel, request).
 
 let oscore_princial =
   in(secureChannel, req: CoAP_request);
-  let (header:CoAP_header, token:CoAP_token, OSCORE:CoAP_option, payload:CoAP_payload) = req in
-  new add: additional_data;
-  new secret_plaintext: ptext;
+  (*Decode the received message from "TLS" *)
+  let (header:CoAP_header, token:CoAP_token, option:CoAP_option, payload:CoAP_payload) = destructR(req) in
+  let (version:CoAP_version, confirmCode: CoAP_confirmCode, tlength: CoAP_tokenlength, requestCode: CoAP_requestCode, messageId: CoAP_messageID) = destructH(header) in
+
+  (*Generate additation authenticated data. No options that should be integrity protected for now*)
+  let aad = AAD(oscore_version_one(), default_aead_algorithm(), sid, partial_iv(agreed_sender_sequence_number)) in
+
+  (*Plaintext is equivalent to a CoAP message without header. *)
+  (*It consists of the data to be encrypted, e.g the Request Code, the class E options, and the payload of the original CoAP message*)
+  let secret_plaintext = plaintext(requestCode, payload) in (*This early draft assumes no Class E option*)
+
+  (*We compute the AEAD nonce from sender_id, common_iv, and the partial iv(which is apparently just the sender sequence number)*)
   let aeadnonce = aead_nonce(sid, common_iv, partial_iv(agreed_sender_sequence_number)) in
-  let ciphertext = enc_COSE_ciphertext(sender_key, aeadnonce, secret_plaintext, add) in
-  let COSE = createCOSE(partial_iv(agreed_sender_sequence_number), sid, ciphertext) in
-  event here;
-  out(c, COSE).
 
-query attacker(new secret_plaintext).
+  (*The ciphertext of the COSE object is constructed using the sender key, an aead nonce, the plaintext, and the aad*)
+  let ciphertext = enc_COSE_ciphertext(sender_key, aeadnonce, secret_plaintext, aad) in
 
+  (*We create the COSE object, where the protected field is empty, unprotected is the partial iv, and sid. The ciphertext *)
+  let COSEobject = createCOSE(partial_iv(agreed_sender_sequence_number), sid, ciphertext) in
+
+  let (partialiv:sender_sequence_number, kid: sender_id) = getUnprotected(COSEobject) in
+  let OSCORE_OPTION = CoAP_OSCORE_Option(partialiv,kid) in
+  let dummyCode = CoAP_GETCode() in
+  (*We are ready to send an OSCORE request*)
+  let header = createHeader(version, confirmCode, tlength, dummyCode, messageId) in
+  let request = createRequest(header, token, OSCORE_OPTION, payload) in
+  out(c, request).
+
+query attacker (new rcode).
 process
   (!oscore_princial) | (!oscore_princial) | (!request_sender)
