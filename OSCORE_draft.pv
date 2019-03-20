@@ -40,6 +40,7 @@ type sender_sequence_number.
 type sender_context.
 type sender_id.
 fun CoAP_OSCORE_Option(sender_sequence_number, sender_id) : CoAP_option.
+reduc forall partiv: sender_sequence_number, sendid: sender_id; destructOSCORE_OPTION(CoAP_OSCORE_Option(partiv, sendid)) = (partiv, sendid).
 fun CoAP_EmptyOption(): CoAP_option.
 type iv.
 fun partial_iv(sender_sequence_number): iv.
@@ -62,21 +63,12 @@ type additional_data.
 fun AADwOption(oscore_version, aead_algorithm, sender_id, iv, CoAP_option) : additional_data.
 (*AAD with no integrity protected options*)
 fun AAD(oscore_version, aead_algorithm, sender_id, iv) : additional_data.
-fun aead_nonce(sender_id, iv, iv) : nonce.
+fun aead_nonce(sender_id, iv, sender_sequence_number) : nonce.
 type ptext.
 fun plaintext(CoAP_requestCode, CoAP_payload) : ptext.
 (*********************************************)
 (*                    COSE                   *)
 (*********************************************)
-
-type COSE.
-type COSE_ciphertext.
-fun enc_COSE_ciphertext(oscore_key, nonce, ptext, additional_data): COSE_ciphertext.
-fun payload_from_ciphertext(COSE_ciphertext):CoAP_payload.
-reduc forall k:oscore_key, n:nonce, plain: ptext, add:additional_data; dec_COSE_ciphertext(enc_COSE_ciphertext(k,n,plain,add), k, n, add) = plain.
-fun createCOSE(iv, sender_id, COSE_ciphertext) : COSE.
-reduc forall partialiv: iv, kid:sender_id, ciphertex: COSE_ciphertext; getUnprotected(createCOSE(partialiv,kid,ciphertex)) = (partialiv,kid).
-reduc forall partialiv: iv, kid:sender_id, ciphertex: COSE_ciphertext; getCiphertext(createCOSE(partialiv,kid,ciphertex)) = ciphertex.
 
 (* No model of the protected data - it's always empty*)
 (* IV and Sender_ID are contained in the unprotected field*)
@@ -90,23 +82,37 @@ query event(here).
 (*CHANGE THIS TO BE MORE GENERIC*)
 free common_iv:iv[private].
 free sid:sender_id[private].
-free sender_key:oscore_key[private].
+fun sender_key (sender_id):oscore_key[private].
+free senderkey : oscore_key[private].
+(*WRONG RECIPIENT KEY FUNCTION. TODO: Change to sender id½*)
 fun recipient_key(oscore_key):oscore_key.
 free agreed_sender_sequence_number:sender_sequence_number[private].
+(* Not this*)
+type COSE.
+type COSE_ciphertext.
+fun enc_COSE_ciphertext(oscore_key, nonce, ptext, additional_data): COSE_ciphertext.
+fun payload_from_ciphertext(COSE_ciphertext):CoAP_payload.
+reduc forall x:COSE_ciphertext; ciphertext_from_payload(payload_from_ciphertext(x)) = x.
+reduc forall k:oscore_key, n:nonce, plain: ptext, add:additional_data; dec_COSE_ciphertext(enc_COSE_ciphertext(k,n,plain,add), k, n, add) = plain.
+reduc forall k:oscore_key, n:nonce, plain: ptext, add:additional_data; dec_COSE_ciphertext_recipient(enc_COSE_ciphertext(k,n,plain,add), recipient_key(k), n, add) = plain.
+
+fun createCOSE(sender_sequence_number, sender_id, COSE_ciphertext) : COSE.
+reduc forall partialiv: sender_sequence_number, kid:sender_id, ciphertex: COSE_ciphertext; getUnprotected(createCOSE(partialiv,kid,ciphertex)) = (partialiv,kid).
+reduc forall partialiv: sender_sequence_number, kid:sender_id, ciphertex: COSE_ciphertext; getCiphertext(createCOSE(partialiv,kid,ciphertex)) = ciphertex.
 
 let request_sender =
 (*HEADER*)
   let version = CoAP_versionOne() in
   let confirm = CoAP_nonConfirm() in
   let tlength = CoAP_expectedLength() in
-  let rcode = CoAP_POSTCode();
+  let rcode = CoAP_POSTCode() in
   new messageID : CoAP_messageID;
   let header = createHeader(version, confirm, tlength, rcode, messageID) in
 (*HEADER END*)
 (*BODY*)
   new token : CoAP_token;
 
-  let payload = payload_fromId(messageID) in
+  new payload : CoAP_payload;
 (*BODY*)
 (*Assemble request and send*)
   let request = createRequest(header, token, CoAP_EmptyOption(), payload) in
@@ -126,13 +132,16 @@ let oscore_princial =
   let secret_plaintext = plaintext(requestCode, payload) in (*This early draft assumes no Class E option*)
 
   (*We compute the AEAD nonce from sender_id, common_iv, and the partial iv(which is apparently just the sender sequence number)*)
-  let aeadnonce = aead_nonce(sid, common_iv, partial_iv(agreed_sender_sequence_number)) in
+  (*TODO: remove agreed sender sequence number with generic*)
+  (*TODO: remove senderid  number with generic*)
+  (*TODO: remove common_iv number with generic*)
+  let aeadnonce = aead_nonce(sid, common_iv, agreed_sender_sequence_number) in
 
   (*The ciphertext of the COSE object is constructed using the sender key, an aead nonce, the plaintext, and the aad*)
-  let ciphertext = enc_COSE_ciphertext(sender_key, aeadnonce, secret_plaintext, aad) in
+  let ciphertext = enc_COSE_ciphertext(senderkey, aeadnonce, secret_plaintext, aad) in
 
   (*We create the COSE object, where the protected field is empty, unprotected is the partial iv, and sid. The ciphertext *)
-  let COSEobject = createCOSE(partial_iv(agreed_sender_sequence_number), sid, ciphertext) in
+  let COSEobject = createCOSE(agreed_sender_sequence_number, sid, ciphertext) in
   (*Why do we create an object and then destruct it? Well, COSE is supposed to be compressed *)
   (*and this is how its done in the protocol*)
   (*it might not make sense to do it like this in ProVerif*)
@@ -142,15 +151,37 @@ let oscore_princial =
   let OSCORE_OPTION = CoAP_OSCORE_Option(partialiv,kid) in
   (*The oscore request should contain a dummy code*)
   let dummyCode = CoAP_GETCode() in
-
-
-
   (*We are ready to send an OSCORE request*)
   (*The payload from the original CoAP message is encrypted in COSE and then added as payload*)
   let header = createHeader(version, confirmCode, tlength, dummyCode, messageId) in
   let request = createRequest(header, token, OSCORE_OPTION, payload_from_ciphertext(ciphertex)) in
   out(c, request).
 
-query attacker (new messageID).
+let oscore_recipient =
+  in(c, req:CoAP_request);
+  let (reqheader:CoAP_header, token:CoAP_token, option:CoAP_option, payload:CoAP_payload) = destructR(req) in
+  let (version:CoAP_version, confirmCode: CoAP_confirmCode, tlength: CoAP_tokenlength, requestCode: CoAP_requestCode, messageId: CoAP_messageID) = destructH(reqheader) in
+  (*
+  Discard all class E options (If a option that should be encrypted is visible in the header, we instead discard
+  N.B we don't have any class E at this point in time TODO: Implement class E.
+  *)
+  (*Using kid parameter to receive a recipient context:*)
+  let (partialiv:sender_sequence_number, kid: sender_id) = destructOSCORE_OPTION(option) in
+  let rec_key = recipient_key(senderkey) in
+  (*- Check Partial IV is unique.. TODO: implement*)
+  let ciphertext = ciphertext_from_payload(payload) in
+  (*Decompress the COSE Object. TODO: Implement decompression?*)
+  (*Compose AAD*)
+  let aad = AAD(oscore_version_one(), default_aead_algorithm(), kid, partial_iv(partialiv)) in
+  (*Compute the AEAD Nonce*)
+  let aeadnonce = aead_nonce(sid, common_iv, agreed_sender_sequence_number) in
+
+  (*Decrypt the COSE object*)
+  let plaintext = dec_COSE_ciphertext_recipient(ciphertext, rec_key, aeadnonce, aad) in
+  event here;
+  out(c, ciphertext);
+
+  0.
+query attacker (plaintext(CoAP_POSTCode, new payload)).
 process
-  (!oscore_princial) | (!oscore_princial) | (!request_sender)
+  (!oscore_princial) | (!oscore_princial) | (!request_sender) | (!oscore_recipient)
