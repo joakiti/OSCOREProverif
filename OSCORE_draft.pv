@@ -99,12 +99,13 @@ let request_sender =
   let version = CoAP_versionOne() in
   let confirm = CoAP_nonConfirm() in
   let tlength = CoAP_expectedLength() in
-  new rcode : CoAP_requestCode;
+  let rcode = CoAP_POSTCode();
   new messageID : CoAP_messageID;
   let header = createHeader(version, confirm, tlength, rcode, messageID) in
 (*HEADER END*)
 (*BODY*)
   new token : CoAP_token;
+
   let payload = payload_fromId(messageID) in
 (*BODY*)
 (*Assemble request and send*)
@@ -132,16 +133,24 @@ let oscore_princial =
 
   (*We create the COSE object, where the protected field is empty, unprotected is the partial iv, and sid. The ciphertext *)
   let COSEobject = createCOSE(partial_iv(agreed_sender_sequence_number), sid, ciphertext) in
-
+  (*Why do we create an object and then destruct it? Well, COSE is supposed to be compressed *)
+  (*and this is how its done in the protocol*)
+  (*it might not make sense to do it like this in ProVerif*)
   let (partialiv:sender_sequence_number, kid: sender_id) = getUnprotected(COSEobject) in
   let ciphertex : COSE_ciphertext = getCiphertext(COSEobject) in
+  (*The oscore option contains a compressed COSE object with it's unprotected fields*)
   let OSCORE_OPTION = CoAP_OSCORE_Option(partialiv,kid) in
+  (*The oscore request should contain a dummy code*)
   let dummyCode = CoAP_GETCode() in
+
+
+
   (*We are ready to send an OSCORE request*)
+  (*The payload from the original CoAP message is encrypted in COSE and then added as payload*)
   let header = createHeader(version, confirmCode, tlength, dummyCode, messageId) in
   let request = createRequest(header, token, OSCORE_OPTION, payload_from_ciphertext(ciphertex)) in
   out(c, request).
 
-query attacker (new rcode).
+query attacker (new messageID).
 process
   (!oscore_princial) | (!oscore_princial) | (!request_sender)
