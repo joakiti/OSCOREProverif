@@ -96,6 +96,7 @@ free senderkey : oscore_key[private].
 fun recipient_key(oscore_key):oscore_key.
 free agreed_sender_sequence_number:sender_sequence_number[private].
 (* Not this*)
+type COSEObject.
 type COSE_ciphertext.
 fun enc_COSE_ciphertext(oscore_key, nonce, bitstring, additional_data): COSE_ciphertext.
 fun payload_from_ciphertext(COSE_ciphertext):CoAP_payload[data].
@@ -106,7 +107,7 @@ reduc forall k:oscore_key, n:nonce, plain: bitstring, add:additional_data;
 reduc forall k:oscore_key, n:nonce, plain: bitstring, add:additional_data;
   dec_COSE_ciphertext_recipient(enc_COSE_ciphertext(k,n,plain,add), recipient_key(k), n, add) = plain.
 
-fun COSE(sender_sequence_number, sender_id, COSE_ciphertext): COSE[data].
+fun COSE(sender_sequence_number, sender_id, COSE_ciphertext): COSEObject[data].
 
 let request_sender =
   new token : CoAP_token;
@@ -147,8 +148,7 @@ let oscore_princial =
   (*Why do we create an object and then destruct it? Well, COSE is supposed to be compressed *)
   (*and this is how its done in the protocol*)
   (*it might not make sense to do it like this in ProVerif*)
-  let (partialiv:sender_sequence_number, kid: sender_id) = getUnprotected(COSEobject) in
-  let ciphertex : COSE_ciphertext = getCiphertext(COSEobject) in
+  let COSE(partialiv, kid, ciphertex) = COSEobject in
   (*The oscore option contains a compressed COSE object with it's unprotected fields*)
   let OSCORE_OPTION = CoAP_OSCORE_Option(partialiv,kid) in
   (*The oscore request should contain a dummy code*)
@@ -171,17 +171,17 @@ let oscore_recipient =
   let (partialiv:sender_sequence_number, kid: sender_id) = destructOSCORE_OPTION(option) in
   let rec_key = recipient_key(senderkey) in
   (*- Check Partial IV is unique.. TODO: implement*)
-  let ciphertext = ciphertext_from_payload(payload) in
+  let payload_from_ciphertext(p) = payload in
   (*Decompress the COSE Object. TODO: Implement decompression?*)
   (*Compose AAD*)
   let aad = AAD(oscore_version_one(), default_aead_algorithm(), kid, partial_iv(partialiv)) in
   (*Compute the AEAD Nonce*)
   let aeadnonce = aead_nonce(sid, common_iv, agreed_sender_sequence_number) in
   (*Decrypt the COSE object*)
-  let decrypted_plaintext = dec_COSE_ciphertext_recipient(ciphertext, rec_key, aeadnonce, aad) in
+  let decrypted_plaintext = dec_COSE_ciphertext_recipient(p, rec_key, aeadnonce, aad) in
   (*TODO: Verify the options, etc.*)
   event here;
-  out(c, ciphertext);
+  out(c, decrypted_plaintext);
   0.
 query attacker(new payload).
 
