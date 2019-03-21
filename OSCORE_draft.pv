@@ -1,15 +1,12 @@
 free c: channel.
-(*******************)
-(* Everything COAP *)
-(*******************)
+
+(*CoAP*)
 type CoAP_Message[data].
 type CoAP_header[data].
-(*CoAP body begin*)
 type CoAP_token[data].
 type CoAP_options[data].
 type CoAP_option[data].
 type CoAP_payload[data].
-(*CoAP header*)
 type CoAP_version[data].
 fun CoAP_versionOne(): CoAP_version.
 type CoAP_confirmCode[data].
@@ -18,56 +15,43 @@ fun CoAP_nonConfirm(): CoAP_confirmCode.
 type CoAP_tokenlength[data].
 fun CoAP_tokenLength(CoAP_token): CoAP_tokenlength.
 type CoAP_MessageCode[data].
+type CoAP_messageID[data].
+
+(*Options*)
+fun CoAP_Option_OSCORE_Option(iv, id) : CoAP_option[data].
+fun CoAP_Option_OSCORE_Option_empty() : CoAP_option[data].
+fun CoAP_EmptyOption(): CoAP_option.
+
+(*Codes*)
 fun CoAP_GETCode(): CoAP_MessageCode.
 fun CoAP_POSTCode(): CoAP_MessageCode.
 fun CoAP_CHANGEDCode(): CoAP_MessageCode.
-type CoAP_messageID[data].
 
+(*Constructors*)
 fun Header(CoAP_version, CoAP_confirmCode, CoAP_tokenlength, CoAP_MessageCode, CoAP_messageID) : CoAP_header[data].
 fun Request(CoAP_header, CoAP_token, CoAP_option, CoAP_payload) : CoAP_Message[data].
-(*******************)
-(*    OSCORE       *)
-(*******************)
+
+(* Default options. TODO: Delete? *)
 type oscore_version.
 fun oscore_version_one() : oscore_version.
 type aead_algorithm.
 fun default_aead_algorithm(): aead_algorithm.
-type hkdf_algorithm.
-fun default_hkdf_algorithm(): hkdf_algorithm.
-type hkdf_key_type.
-fun key_type() : hkdf_key_type.
-fun iv_type() : hkdf_key_type.
-type id.
-(*We dont model ID context at the time*)
-(*We dont model the size of the key nonce for aead algorithm*)
-type info.
-type nonce.
-type additional_data.
-(*******************)
-(*Security Contexts*)
-(*******************)
-type master_secret.
-type master_salt.
-type key.
-type iv.
-type sender_sequence_number.
-fun CoAP_Option_OSCORE_Option(iv, id) : CoAP_option[data].
-fun CoAP_Option_OSCORE_Option_empty() : CoAP_option[data].
 
-fun CoAP_EmptyOption(): CoAP_option.
-(*AAD with no integrity protected options*)
+(*Cryptographic elements*)
+type id. (* Initiator / Responder ID, aka. KID *)
+type key. (* Initiator / Responder key*)
+type nonce. (* AEAD Nonce *)
+type additional_data. (* Additional data for AEAD *)
+type iv. (*Common IV or Partial IV*)
+
 fun AAD(oscore_version, aead_algorithm, id, iv) : additional_data[data].
+(*Sender ID, CommonIV, PartialIV*)
 fun aead_nonce(id, iv, iv) : nonce.
-(*********************************************)
-(*                    COSE                   *)
-(*********************************************)
-(* No model of the protected data - it's always empty*)
-(* IV and Sender_ID are contained in the unprotected field*)
-(* COSE_ciphertext is the ciphertext field*)
 
 event Reveal(key).
 event IvReveal(iv).
 event here.
+
 query event(here).
 (* Not this*)
 type COSEObject.
