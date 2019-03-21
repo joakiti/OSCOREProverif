@@ -115,9 +115,6 @@ let oscore_initiator =
   (*It consists of the data to be encrypted, e.g the Request Code, the class E options, and the payload of the original CoAP message*)
   let secret_plaintext = (rcode, payload) in (*This early draft assumes no Class E option*)
   (*We compute the AEAD nonce from sender_id, common_iv, and the partial iv(which is apparently just the sender sequence number)*)
-  (*TODO: remove agreed sender sequence number with generic*)
-  (*TODO: remove senderid  number with generic*)
-  (*TODO: remove common_iv number with generic*)
   let aeadnonce = aead_nonce(IDir, CommonIv, partial_iv) in
   (*The ciphertext of the COSE object is constructed using the sender key, an aead nonce, the plaintext, and the aad*)
   let ciphertext = enc_COSE_ciphertext(Kir, aeadnonce, secret_plaintext, aad) in
@@ -140,8 +137,15 @@ let oscore_initiator =
   (*Receive a response*)
   in(c, response:CoAP_Message);
 
-  let Request(resheader, token, option, payload) = response in
-  let Header(version, confirmCode, tlength, requestCode, messageId) = resheader in
+  let Request(resheader, restoken, resoption, respayload) = response in
+  let Header(resversion, resconfirmCode, restlength, resrequestCode, resmessageId) = resheader in
+  if restoken = token then
+  if resoption = CoAP_Option_OSCORE_Option_empty() then
+  let aad = AAD(oscore_version_one(), default_aead_algorithm(), IDri, partial_iv) in
+  let payload_from_ciphertext(p) = respayload in
+  let (rcode : CoAP_MessageCode, decryptedPayload : CoAP_payload) = dec_COSE_ciphertext(p, Kri, aeadnonce, aad) in
+  (*Computing the AEAD nonce.. We know that the oscore option is empty so we use old nonce*)
+  event here;
   0.
 
 let oscore_responder =
@@ -167,37 +171,19 @@ let oscore_responder =
   let aeadnonce = aead_nonce(kid, CommonIv, partial_iv) in
   (*Decrypt the COSE object*)
   let (rcode : CoAP_MessageCode, decryptedPayload : CoAP_payload) = dec_COSE_ciphertext(p, Kir, aeadnonce, aad) in
-
   (*************************)
   (*  Response Generation  *)
   (*************************)
   let responsePayload = generateResponsePayload(rcode, decryptedPayload) in
   let responseCode = generateResponseCode(rcode, decryptedPayload) in
-
   let response_secret_plaintext = (responseCode, responsePayload) in (*This early draft assumes no Class E option*)
   let responseAad = AAD(oscore_version_one(), default_aead_algorithm(), IDri, partial_iv) in
-
-  (*
-          We use the AEAD nonce from the request.
-  *)
+  (*We use the AEAD nonce from the request.*)
   let ciphertext = enc_COSE_ciphertext(Kri, aeadnonce, response_secret_plaintext, responseAad) in
   let COSEobject = COSE(partial_iv, IDri, ciphertext) in
-  (*
-  4.  Encrypt the COSE object using the Sender Key. Compress the COSE
-        Object as specified in Section 6.  If the AEAD nonce was
-        constructed from a new Partial IV, this Partial IV MUST be
-        included in the message.  If the AEAD nonce from the request was
-        used, the Partial IV MUST NOT be included in the message.
-
-        Hmm.. we should test out what happens if it IS included :)
-  *)
-  (*HEADER*)
   let responseDummyCode = CoAP_CHANGEDCode() in
   let OSCORE_OPTION = CoAP_Option_OSCORE_Option_empty() in
   new responseMessageId : CoAP_messageID;
-  (*HEADER END*)
-  (*BODY*)
-  (*TODO: Verify the options, etc.*)
   let header = Header(CoAP_versionOne(),  CoAP_nonConfirm(), CoAP_tokenLength(token), responseDummyCode, responseMessageId) in
   let request = Request(header, token, OSCORE_OPTION, payload_from_ciphertext(ciphertext)) in
   out(c, request);
