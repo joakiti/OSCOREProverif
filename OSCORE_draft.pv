@@ -1,5 +1,4 @@
 free c: channel.
-free secureChannel:channel[private].
 (*******************)
 (* Everything COAP *)
 (*******************)
@@ -57,27 +56,21 @@ type sender_context.
 type recipient_context.
 type master_secret.
 type master_salt.
-type oscore_key.
+type key.
 type iv.
 fun gen_info(sender_id, aead_algorithm, hkdf_key_type) : info.
-fun derive_key(master_salt, master_secret, info) : oscore_key.
-fun create_common_context(aead_algorithm, hkdf_algorithm, master_secret, master_salt, iv) : common_context.
-reduc forall aa:aead_algorithm, dha: hkdf_algorithm, ms: master_secret, mss: master_salt, initv: iv; destructCOMMON_CONTEXT(create_common_context(aa, dha,ms, mss, initv)) = (aa, dha,ms, mss, initv).
-fun create_security_context(common_context, sender_context, recipient_context): security_context.
-reduc forall cc:common_context, sc:sender_context, rc:recipient_context; destructSECURITY_CONTEXT(create_security_context(cc,sc,rc)) = (cc,sc,rc).
+fun derive_key(master_salt, master_secret, info) : key.
+fun CommonContext(aead_algorithm, hkdf_algorithm, master_secret, master_salt, iv) : common_context[data].
+fun SecurityContext(common_context, sender_context, recipient_context): security_context[data].
 type sender_sequence_number.
-fun CoAP_OSCORE_Option(sender_sequence_number, sender_id) : CoAP_option.
-reduc forall partiv: sender_sequence_number, sendid: sender_id; destructOSCORE_OPTION(CoAP_OSCORE_Option(partiv, sendid)) = (partiv, sendid).
+fun CoAP_OSCORE_Option(iv, sender_id) : CoAP_option[data].
 fun CoAP_EmptyOption(): CoAP_option.
-fun partial_iv(sender_sequence_number): iv.
 
 fun getSenderContext(sender_id) : sender_context.
-fun getSenderKey(sender_context) : oscore_key.
+fun getSenderKey(sender_context) : key.
 
-(*AAD with CoAP Option*)
-fun AADwOption(oscore_version, aead_algorithm, sender_id, iv, CoAP_option) : additional_data.
 (*AAD with no integrity protected options*)
-fun AAD(oscore_version, aead_algorithm, sender_id, iv) : additional_data.
+fun AAD(oscore_version, aead_algorithm, sender_id, iv) : additional_data[data].
 fun aead_nonce(sender_id, iv, sender_sequence_number) : nonce.
 (*********************************************)
 (*                    COSE                   *)
@@ -85,32 +78,32 @@ fun aead_nonce(sender_id, iv, sender_sequence_number) : nonce.
 (* No model of the protected data - it's always empty*)
 (* IV and Sender_ID are contained in the unprotected field*)
 (* COSE_ciphertext is the ciphertext field*)
+
+event Reveal(key).
+event IvReveal(iv).
+
 event here.
 query event(here).
-(*CHANGE THIS TO BE MORE GENERIC*)
-free common_iv:iv[private].
+
 free sid:sender_id[private].
-fun sender_key (sender_id):oscore_key[private].
-free senderkey : oscore_key[private].
-(*WRONG RECIPIENT KEY FUNCTION. TODO: Change to sender id½*)
-fun recipient_key(oscore_key):oscore_key.
-free agreed_sender_sequence_number:sender_sequence_number[private].
+free agreed_sender_sequence_number:sender_sequence_number.
 (* Not this*)
 type COSEObject.
 type COSE_ciphertext.
-fun enc_COSE_ciphertext(oscore_key, nonce, bitstring, additional_data): COSE_ciphertext.
+fun enc_COSE_ciphertext(key, nonce, bitstring, additional_data): COSE_ciphertext.
 fun payload_from_ciphertext(COSE_ciphertext):CoAP_payload[data].
-reduc forall k:oscore_key, n:nonce, plain: bitstring, add:additional_data;
+reduc forall k:key, n:nonce, plain: bitstring, add:additional_data;
   dec_COSE_ciphertext(enc_COSE_ciphertext(k,n,plain,add), k, n, add) = plain.
-reduc forall k:oscore_key, n:nonce, plain: bitstring, add:additional_data;
+reduc forall k:key, n:nonce, plain: bitstring, add:additional_data;
   dec_COSE_ciphertext_no_ad(enc_COSE_ciphertext(k,n,plain,add), k, n) = plain.
-reduc forall k:oscore_key, n:nonce, plain: bitstring, add:additional_data;
-  dec_COSE_ciphertext_recipient(enc_COSE_ciphertext(k,n,plain,add), recipient_key(k), n, add) = plain.
+table context(key, key, iv).
 
 fun COSE(sender_sequence_number, sender_id, COSE_ciphertext): COSEObject[data].
 
-let oscore_princial =
+let oscore_initiator =
+  get context(Kir:key, Kri:key, CommonIv:iv) in
   new token : CoAP_token;
+  new partial_iv: iv;
   (*HEADER*)
   let version = CoAP_versionOne() in
   let confirm = CoAP_nonConfirm() in
@@ -123,7 +116,7 @@ let oscore_princial =
   (*BODY*)
   (*Assemble request and send*)
   (*Generate additation authenticated data. No options that should be integrity protected for now*)
-  let aad = AAD(oscore_version_one(), default_aead_algorithm(), sid, partial_iv(agreed_sender_sequence_number)) in
+  let aad = AAD(oscore_version_one(), default_aead_algorithm(), sid, partial_iv) in
   (*Plaintext is equivalent to a CoAP message without header. *)
   (*It consists of the data to be encrypted, e.g the Request Code, the class E options, and the payload of the original CoAP message*)
   let secret_plaintext = (rcode, payload) in (*This early draft assumes no Class E option*)
@@ -131,9 +124,9 @@ let oscore_princial =
   (*TODO: remove agreed sender sequence number with generic*)
   (*TODO: remove senderid  number with generic*)
   (*TODO: remove common_iv number with generic*)
-  let aeadnonce = aead_nonce(sid, common_iv, agreed_sender_sequence_number) in
+  let aeadnonce = aead_nonce(sid, CommonIv, agreed_sender_sequence_number) in
   (*The ciphertext of the COSE object is constructed using the sender key, an aead nonce, the plaintext, and the aad*)
-  let ciphertext = enc_COSE_ciphertext(senderkey, aeadnonce, secret_plaintext, aad) in
+  let ciphertext = enc_COSE_ciphertext(Kir, aeadnonce, secret_plaintext, aad) in
   (*We create the COSE object, where the protected field is empty, unprotected is the partial iv, and sid. The ciphertext *)
   let COSEobject = COSE(agreed_sender_sequence_number, sid, ciphertext) in
   (*Why do we create an object and then destruct it? Well, COSE is supposed to be compressed *)
@@ -141,7 +134,7 @@ let oscore_princial =
   (*it might not make sense to do it like this in ProVerif*)
   let COSE(partialiv, kid, ciphertex) = COSEobject in
   (*The oscore option contains a compressed COSE object with it's unprotected fields*)
-  let OSCORE_OPTION = CoAP_OSCORE_Option(partialiv,kid) in
+  let OSCORE_OPTION = CoAP_OSCORE_Option(partial_iv,kid) in
   (*The oscore request should contain a dummy code*)
   let dummyCode = CoAP_GETCode() in
   (*We are ready to send an OSCORE request*)
@@ -150,8 +143,9 @@ let oscore_princial =
   let request = Request(header, token, OSCORE_OPTION, payload_from_ciphertext(ciphertex)) in
   out(c, request).
 
-let oscore_recipient =
+let oscore_responder =
   in(c, req:CoAP_request);
+  get context(Kir:key, Kri:key, CommonIv:iv) in
   let Request(reqheader, token, option, payload) = req in
   let Header(version, confirmCode, tlength, requestCode, messageId) = reqheader in
   (*
@@ -159,27 +153,31 @@ let oscore_recipient =
   N.B we don't have any class E at this point in time TODO: Implement class E.
   *)
   (*Using kid parameter to receive a recipient context:*)
-  let CoAP_OSCORE_Option(partialiv:sender_sequence_number, kid: sender_id) = option in
-  let rec_key = recipient_key(senderkey) in
+  let CoAP_OSCORE_Option(partial_iv, kid) = option in
   (*- Check Partial IV is unique.. TODO: implement*)
   let payload_from_ciphertext(p) = payload in
   (*Decompress the COSE Object. TODO: Implement decompression?*)
   (*Compose AAD*)
-  let aad = AAD(oscore_version_one(), default_aead_algorithm(), kid, partial_iv(partialiv)) in
+  let aad = AAD(oscore_version_one(), default_aead_algorithm(), kid, partial_iv) in
   (*Compute the AEAD Nonce*)
-  let aeadnonce = aead_nonce(sid, common_iv, agreed_sender_sequence_number) in
+  let aeadnonce = aead_nonce(sid, CommonIv, agreed_sender_sequence_number) in
   (*Decrypt the COSE object*)
-  let decrypted_plaintext = dec_COSE_ciphertext_recipient(p, rec_key, aeadnonce, aad) in
+  let decrypted_plaintext = dec_COSE_ciphertext(p, Kir, aeadnonce, aad) in
   (*TODO: Verify the options, etc.*)
   event here;
-  out(c, decrypted_plaintext);
+  out(c, p);
   0.
-query attacker(new payload).
 
+query Kir:key; attacker(new payload) ==> event (Reveal(Kir)).
+
+let init =
+  new Kir: key; new Kri: key; new CommonIv:iv;
+  insert context(Kir, Kri, CommonIv);
+  (
+      (event Reveal(Kir); out(c, Kir)) |
+      (event Reveal(Kri); out(c, Kri)) |
+      (event IvReveal(CommonIv); out(c, CommonIv))
+  ).
 
 process
-  new masterSecret : master_secret; new masterSalt : master_salt; new commoniv : iv;
-  let commoncontext = create_common_context(default_aead_algorithm(), default_hkdf_algorithm, masterSecret, masterSalt, common_iv) in
-
-
-  (!request_sender) | (!oscore_recipient)
+  (!oscore_initiator) | (!oscore_responder) | (!init)
