@@ -17,6 +17,13 @@ fun CoAP_tokenLength(CoAP_token): CoAP_tokenlength.
 type CoAP_MessageCode[data].
 type CoAP_messageID[data].
 
+(*Cryptographic elements*)
+type id. (* Initiator / Responder ID, aka. KID *)
+type key. (* Initiator / Responder key*)
+type nonce. (* AEAD Nonce *)
+type additional_data. (* Additional data for AEAD *)
+type iv. (*Common IV or Partial IV*)
+
 (*Options*)
 fun CoAP_Option_OSCORE_Option(iv, id) : CoAP_option[data].
 fun CoAP_Option_OSCORE_Option_empty() : CoAP_option[data].
@@ -37,12 +44,6 @@ fun oscore_version_one() : oscore_version.
 type aead_algorithm.
 fun default_aead_algorithm(): aead_algorithm.
 
-(*Cryptographic elements*)
-type id. (* Initiator / Responder ID, aka. KID *)
-type key. (* Initiator / Responder key*)
-type nonce. (* AEAD Nonce *)
-type additional_data. (* Additional data for AEAD *)
-type iv. (*Common IV or Partial IV*)
 
 fun AAD(oscore_version, aead_algorithm, id, iv) : additional_data[data].
 (*Sender ID, CommonIV, PartialIV*)
@@ -50,9 +51,10 @@ fun aead_nonce(id, iv, iv) : nonce.
 
 event Reveal(key).
 event IvReveal(iv).
+event PartialIvReplay(iv).
 event here.
 
-query event(here).
+query partialiv:iv; event(PartialIvReplay(partialiv)).
 (* Not this*)
 type COSEObject.
 type COSE_ciphertext.
@@ -75,6 +77,7 @@ reduc forall k:key, n:nonce, plain: bitstring, add:additional_data;
 
 
 table context(key, id, key, id, iv).
+table unique_ivs(iv).
 
 fun COSE(iv, id, COSE_ciphertext): COSEObject[data].
 
@@ -123,9 +126,9 @@ let oscore_initiator =
   let Header(resversion, resconfirmCode, restlength, resrequestCode, resmessageId) = resheader in
   if restoken = token then (*Bind response to request*)
   if resoption = CoAP_Option_OSCORE_Option_empty() then
-  let aad = AAD(oscore_version_one(), default_aead_algorithm(), IDri, partial_iv) in
+  let resaad = AAD(oscore_version_one(), default_aead_algorithm(), IDri, partial_iv) in
   let payload_from_ciphertext(p) = respayload in
-  let (rcode : CoAP_MessageCode, decryptedPayload : CoAP_payload) = dec_COSE_ciphertext(p, Kri, aeadnonce, aad) in
+  let (rescode : CoAP_MessageCode, decryptedPayload : CoAP_payload) = dec_COSE_ciphertext(p, Kri, aeadnonce, aad) in
   (*Computing the AEAD nonce.. We know that the oscore option is empty so we use old nonce*)
   event here;
   0.
@@ -138,9 +141,9 @@ let oscore_responder =
   get context(Kir:key, IDir:id, Kri:key, IDri: id, CommonIv:iv) in
   let Request(reqheader, token, option, payload) = req in
   let Header(version, confirmCode, tlength, requestCode, messageId) = reqheader in
-
   let CoAP_Option_OSCORE_Option(partial_iv, kid) = option in
   (*- Check Partial IV is unique.. TODO: implement*)
+  get unique_ivs(partial:iv) suchthat partial = partial_iv else event PartialIvReplay(partial_iv);
   let payload_from_ciphertext(p) = payload in
   (*Decompress the COSE Object. TODO: Implement decompression?*)
   (*Compose AAD*)
