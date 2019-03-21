@@ -143,7 +143,11 @@ let oscore_responder =
   let Header(version, confirmCode, tlength, requestCode, messageId) = reqheader in
   let CoAP_Option_OSCORE_Option(partial_iv, kid) = option in
   (*- Check Partial IV is unique.. TODO: implement*)
-  get unique_ivs(partial:iv) suchthat partial = partial_iv else event PartialIvReplay(partial_iv);
+
+  (*If we get the same we execute partialreplay event, otherwise, we continue.*)
+  get unique_ivs(partial:iv) suchthat partial = partial_iv in event PartialIvReplay(partial_iv) else
+  (*keep track of used unique_ivs*)
+  insert unique_ivs(partial_iv);
   let payload_from_ciphertext(p) = payload in
   (*Decompress the COSE Object. TODO: Implement decompression?*)
   (*Compose AAD*)
