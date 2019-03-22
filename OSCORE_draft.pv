@@ -23,7 +23,13 @@ type key. (* Initiator / Responder key*)
 type nonce. (* AEAD Nonce *)
 type additional_data. (* Additional data for AEAD *)
 type iv. (*Common IV or Partial IV*)
+type master_secret.
+type aead_algorithm.
+type oscore_version.
 
+
+fun derive_key(master_secret, id, aead_algorithm): key.
+fun derive_common_iv(master_secret, aead_algorithm): iv.
 (*Options*)
 fun CoAP_Option_OSCORE_Option(iv, id) : CoAP_option[data].
 fun CoAP_Option_OSCORE_Option_empty() : CoAP_option[data].
@@ -39,9 +45,7 @@ fun Header(CoAP_version, CoAP_confirmCode, CoAP_tokenlength, CoAP_MessageCode, C
 fun Request(CoAP_header, CoAP_token, CoAP_option, CoAP_payload) : CoAP_Message[data].
 
 (* Default options. TODO: Delete? *)
-type oscore_version.
 fun oscore_version_one() : oscore_version.
-type aead_algorithm.
 fun default_aead_algorithm(): aead_algorithm.
 
 
@@ -76,15 +80,17 @@ reduc forall k:key, n:nonce, plain: bitstring, add:additional_data;
   dec_COSE_ciphertext_no_ad(enc_COSE_ciphertext(k,n,plain,add), k, n) = plain.
 
 
-table security_context_lookup(id, key, key).
+table security_context_lookup(id, id, master_secret).
 table context(key, id, key, id, iv).
 table unique_ivs(iv).
 
 fun COSE(iv, id, COSE_ciphertext): COSEObject[data].
 
-let oscore_initiator =
-  get context(Kir:key, IDir:id, Kri:key, IDri: id, CommonIv:iv) in
-
+let oscore_initiator(IDir: id) =
+  in(c, IDri: id); (*Receive our endpoint from somewhere*)
+  get security_context_lookup(=IDir, =IDri, msecret:master_secret) in (*Find a security context with endpoint*)
+  let Kir = derive_key(msecret, IDir, default_aead_algorithm()) in
+  let CommonIv = derive_common_iv(msecret, default_aead_algorithm()) in
   new token : CoAP_token;
   new partial_iv: iv;
   let version = CoAP_versionOne() in
@@ -116,19 +122,26 @@ let oscore_initiator =
   let Request(resheader, restoken, resoption, respayload) = response in
   let Header(resversion, resconfirmCode, restlength, resrequestCode, resmessageId) = resheader in
   if restoken = token then (*Bind response to request*)
+  (*In a piggybacked response, the Message ID of the Confirmable
+       request and the Acknowledgement MUST match, and the tokens of the
+       response and original request MUST match.
+
+
+      ---> In a separate response, just the tokens of the response and original request MUST match. <---
+       *)
   if resoption = CoAP_Option_OSCORE_Option_empty() then
   let resaad = AAD(oscore_version_one(), default_aead_algorithm(), IDri, partial_iv) in
   let payload_from_ciphertext(p) = respayload in
+  let Kri = derive_key(msecret, IDri, default_aead_algorithm()) in
   let (rescode : CoAP_MessageCode, decryptedPayload : CoAP_payload) = dec_COSE_ciphertext(p, Kri, aeadnonce, aad) in
   event here;
   0.
 
-let oscore_responder =
+let oscore_responder(IDri: id) =
   (************************)
   (*  Verifying request   *)
   (************************)
   in(c, req:CoAP_Message);
-  get context(Kir:key, IDir:id, Kri:key, IDri: id, CommonIv:iv) in
   let Request(reqheader, token, option, payload) = req in
   let Header(version, confirmCode, tlength, requestCode, messageId) = reqheader in
   let CoAP_Option_OSCORE_Option(partial_iv, kid) = option in
@@ -140,6 +153,11 @@ let oscore_responder =
   insert unique_ivs(partial_iv);
   let payload_from_ciphertext(p) = payload in
   (*Decompress the COSE Object. TODO: Implement decompression?*)
+  (*KEY + COMMON_IV*)
+  get security_context_lookup(=kid, =IDri, msecret:master_secret) in
+  let CommonIv = derive_common_iv(msecret, default_aead_algorithm()) in
+  let Kir = derive_key(msecret, kid, default_aead_algorithm()) in
+  let Kri = derive_key(msecret, IDri, default_aead_algorithm()) in
   (*Compose AAD*)
   let aad = AAD(oscore_version_one(), default_aead_algorithm(), kid, partial_iv) in
   (*Compute the AEAD Nonce*)
@@ -169,8 +187,9 @@ query CommonIv:iv; attacker(new payload) ==> event (IvReveal(CommonIv)).
 query partialiv:iv; inj-event (respondFinish(partialiv)) ==> inj-event(PartialIvReplay(partialiv)).
 
 let init =
-  new Kir: key; new IDir:id; new Kri: key; new IDri:id; new CommonIv:iv;
+  new Kir: key; new IDir:id; new Kri: key; new IDri:id; new CommonIv:iv; new MasterSecret : master_secret;
   out(c, (IDir, IDri));
+  insert security_context_lookup(IDir, IDri, MasterSecret);
   insert context(Kir, IDir, Kri, IDri, CommonIv);
   (
       (event Reveal(Kir); out(c, Kir)) |
@@ -179,4 +198,7 @@ let init =
   ).
 
 process
-  (!oscore_initiator) | (!oscore_responder) | (!init)
+  new IDir:id; new IDri:id; new MasterSecret : master_secret;
+  out(c, (IDir, IDri));
+  insert security_context_lookup(IDir, IDri, MasterSecret);
+  (!oscore_initiator(IDir)) | (!oscore_responder(IDri)) | (!init)
