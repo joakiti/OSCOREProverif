@@ -92,8 +92,9 @@ fun COSE(iv, id, COSE_ciphertext): COSEObject[data].
 let oscore_initiator(IDir: id) =
   in(c, IDri: id); (*Receive our endpoint from somewhere*)
   get security_context_lookup(=IDir, =IDri, msecret:master_secret) in (*Find a security context with endpoint*)
-  let Kir = derive_key(msecret, IDir, default_aead_algorithm()) in
   let CommonIv = derive_common_iv(msecret, default_aead_algorithm()) in
+  let Kir = derive_key(msecret, IDir, default_aead_algorithm()) in
+  let Kri = derive_key(msecret, IDri, default_aead_algorithm()) in
   new token : CoAP_token;
   new partial_iv: iv;
   let version = CoAP_versionOne() in
@@ -132,10 +133,9 @@ let oscore_initiator(IDir: id) =
       ---> In a separate response, just the tokens of the response and original request MUST match. <---
        *)
   if resoption = CoAP_Option_OSCORE_Option_empty() then
-  let resaad = AAD(oscore_version_one(), default_aead_algorithm(), IDri, partial_iv) in
+  let responseAad = AAD(oscore_version_one(), default_aead_algorithm(), IDri, partial_iv) in
   let payload_from_ciphertext(p) = respayload in
-  let Kri = derive_key(msecret, IDri, default_aead_algorithm()) in
-  let (rescode : CoAP_MessageCode, decryptedPayload : CoAP_payload) = dec_COSE_ciphertext(p, Kri, aeadnonce, aad) in
+  let (rescode : CoAP_MessageCode, decryptedPayload : CoAP_payload) = dec_COSE_ciphertext(p, Kri, aeadnonce, responseAad) in
   event here;
   0.
 
