@@ -26,6 +26,8 @@ type iv. (*Common IV or Partial IV*)
 type master_secret.
 type aead_algorithm.
 type oscore_version.
+type COSE_ciphertext.
+
 
 
 fun derive_key(master_secret, id, aead_algorithm): key.
@@ -58,10 +60,11 @@ event IvReveal(iv).
 event PartialIvReplay(iv).
 event here.
 event respondFinish(iv).
+event responseSent(COSE_ciphertext, key, nonce, additional_data).
+event responseReceived(COSE_ciphertext, key, nonce, additional_data).
 
 (* Not this*)
 type COSEObject.
-type COSE_ciphertext.
 fun enc_COSE_ciphertext(key, nonce, bitstring, additional_data): COSE_ciphertext.
 fun payload_from_ciphertext(COSE_ciphertext):CoAP_payload[data].
 fun generateResponsePayload(CoAP_MessageCode, CoAP_payload): CoAP_payload.
@@ -107,14 +110,13 @@ let oscore_initiator(IDir: id) =
   let ciphertext = enc_COSE_ciphertext(Kir, aeadnonce, secret_plaintext, aad) in
   let COSEobject = COSE(partial_iv, IDir, ciphertext) in
   (*it might not make sense to do it like this in ProVerif*)
-  let COSE(partialiv, kid, ciphertex) = COSEobject in
   (*The oscore option contains a compressed COSE object with it's unprotected fields*)
-  let OSCORE_OPTION = CoAP_Option_OSCORE_Option(partial_iv,kid) in
+  let OSCORE_OPTION = CoAP_Option_OSCORE_Option(partial_iv, IDir) in
   (*The oscore request should contain a dummy code*)
   let dummyCode = CoAP_GETCode() in
   (*The payload from the original CoAP message is encrypted in COSE and then added as payload*)
   let header = Header(version, confirm, tlength, dummyCode, messageID) in
-  let request = Request(header, token, OSCORE_OPTION, payload_from_ciphertext(ciphertex)) in
+  let request = Request(header, token, OSCORE_OPTION, payload_from_ciphertext(ciphertext)) in
   out(c, request);
 
   (*Receive a response*)
@@ -171,20 +173,22 @@ let oscore_responder(IDri: id) =
   let responseCode = generateResponseCode(rcode, decryptedPayload) in
   let response_secret_plaintext = (responseCode, responsePayload) in (*This early draft assumes no Class E option*)
   let responseAad = AAD(oscore_version_one(), default_aead_algorithm(), IDri, partial_iv) in
-  (*We use the AEAD nonce from the request.*)
   let ciphertext = enc_COSE_ciphertext(Kri, aeadnonce, response_secret_plaintext, responseAad) in
   let COSEobject = COSE(partial_iv, IDri, ciphertext) in
+  (*We use the AEAD nonce from the request.*)
   let responseDummyCode = CoAP_CHANGEDCode() in
   let OSCORE_OPTION = CoAP_Option_OSCORE_Option_empty() in
   new responseMessageId : CoAP_messageID;
   let header = Header(CoAP_versionOne(),  CoAP_nonConfirm(), CoAP_tokenLength(token), responseDummyCode, responseMessageId) in
   let request = Request(header, token, OSCORE_OPTION, payload_from_ciphertext(ciphertext)) in
-  out(c, request);
-  0.
+  out(c, request).
 
 query Kir:key; attacker(new payload) ==> event (Reveal(Kir)).
 query CommonIv:iv; attacker(new payload) ==> event (IvReveal(CommonIv)).
 query partialiv:iv; inj-event (respondFinish(partialiv)) ==> inj-event(PartialIvReplay(partialiv)).
+query response:COSE_ciphertext, k:key, n:nonce, ad: additional_data; event (responseReceived(response, k, n, ad)) ==> event(responseSent(response, k, n, ad)).
+
+query event(here).
 
 let init =
   new Kir: key; new IDir:id; new Kri: key; new IDri:id; new CommonIv:iv; new MasterSecret : master_secret;
