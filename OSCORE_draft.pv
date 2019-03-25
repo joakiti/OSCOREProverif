@@ -60,8 +60,13 @@ event IvReveal(iv).
 event PartialIvReplay(iv).
 event here.
 event respondFinish(iv).
-event responseSent(COSE_ciphertext, key, nonce, additional_data).
-event responseReceived(COSE_ciphertext, key, nonce, additional_data).
+event beginAparam(id).
+event endAparam(id).
+event beginBparam(id).
+event endBparam(id).
+
+query x: id; inj-event(endBparam(x)) ==> inj-event(beginBparam(x)).
+query x: id; inj-event(endAparam(x)) ==> inj-event(beginAparam(x)).
 
 (* Not this*)
 type COSEObject.
@@ -91,6 +96,7 @@ fun COSE(iv, id, COSE_ciphertext): COSEObject[data].
 
 let oscore_initiator(IDir: id) =
   in(c, IDri: id); (*Receive our endpoint from somewhere*)
+  event beginBparam(IDri); (*Begin event that some host has been accepted, possibly B.*)
   get security_context_lookup(=IDir, =IDri, msecret:master_secret) in (*Find a security context with endpoint*)
   let CommonIv = derive_common_iv(msecret, default_aead_algorithm()) in
   let Kir = derive_key(msecret, IDir, default_aead_algorithm()) in
@@ -136,6 +142,7 @@ let oscore_initiator(IDir: id) =
   let responseAad = AAD(oscore_version_one(), default_aead_algorithm(), IDri, partial_iv) in
   let payload_from_ciphertext(p) = respayload in
   let (rescode : CoAP_MessageCode, decryptedPayload : CoAP_payload) = dec_COSE_ciphertext(p, Kri, aeadnonce, responseAad) in
+  event endAparam(IDir);
   event here;
   0.
 
@@ -147,12 +154,8 @@ let oscore_responder(IDri: id) =
   let Request(reqheader, token, option, payload) = req in
   let Header(version, confirmCode, tlength, requestCode, messageId) = reqheader in
   let CoAP_Option_OSCORE_Option(partial_iv, kid) = option in
-  (*- Check Partial IV is unique.. TODO: implement*)
+  event beginAparam(kid); (*Event that protocol started in processB *)
 
-  (*If we get the same we execute partialreplay event, otherwise, we continue.*)
-  get unique_ivs(partial:iv) suchthat partial = partial_iv in event PartialIvReplay(partial_iv) else
-  (*keep track of used unique_ivs*)
-  insert unique_ivs(partial_iv);
   let payload_from_ciphertext(p) = payload in
   (*Decompress the COSE Object. TODO: Implement decompression?*)
   (*KEY + COMMON_IV*)
@@ -166,6 +169,12 @@ let oscore_responder(IDri: id) =
   let aeadnonce = aead_nonce(kid, CommonIv, partial_iv) in
   (*Decrypt the COSE object*)
   let (rcode : CoAP_MessageCode, decryptedPayload : CoAP_payload) = dec_COSE_ciphertext(p, Kir, aeadnonce, aad) in
+
+  (*If we get the same we execute partialreplay event, otherwise, we continue.*)
+  get unique_ivs(partial:iv) suchthat partial = partial_iv in event PartialIvReplay(partial_iv) else
+  (*keep track of used unique_ivs*)
+  insert unique_ivs(partial_iv);
+  
   (*************************)
   (*  Response Generation  *)
   (*************************)
@@ -181,12 +190,13 @@ let oscore_responder(IDri: id) =
   new responseMessageId : CoAP_messageID;
   let header = Header(CoAP_versionOne(),  CoAP_nonConfirm(), CoAP_tokenLength(token), responseDummyCode, responseMessageId) in
   let request = Request(header, token, OSCORE_OPTION, payload_from_ciphertext(ciphertext)) in
-  out(c, request).
+  out(c, request);
+  event respondFinish(partial_iv);
+  event endBparam(IDri).
 
 query Kir:key; attacker(new payload) ==> event (Reveal(Kir)).
 query CommonIv:iv; attacker(new payload) ==> event (IvReveal(CommonIv)).
-query partialiv:iv; inj-event (respondFinish(partialiv)) ==> inj-event(PartialIvReplay(partialiv)).
-query response:COSE_ciphertext, k:key, n:nonce, ad: additional_data; event (responseReceived(response, k, n, ad)) ==> event(responseSent(response, k, n, ad)).
+query partialiv:iv; inj-event (PartialIvReplay(partialiv)) ==> event(respondFinish(partialiv)).
 
 query event(here).
 
