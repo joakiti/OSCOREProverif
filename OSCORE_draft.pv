@@ -65,9 +65,6 @@ event endAparam(id).
 event beginBparam(id).
 event endBparam(id).
 
-query x: id; inj-event(endBparam(x)) ==> inj-event(beginBparam(x)).
-query x: id; inj-event(endAparam(x)) ==> inj-event(beginAparam(x)).
-
 (* Not this*)
 type COSEObject.
 fun enc_COSE_ciphertext(key, nonce, bitstring, additional_data): COSE_ciphertext.
@@ -125,7 +122,6 @@ let oscore_initiator(IDir: id) =
   let header = Header(version, confirm, tlength, dummyCode, messageID) in
   let request = Request(header, token, OSCORE_OPTION, payload_from_ciphertext(ciphertext)) in
   out(c, request);
-
   (*Receive a response*)
   in(c, response:CoAP_Message);
   let Request(resheader, restoken, resoption, respayload) = response in
@@ -134,8 +130,6 @@ let oscore_initiator(IDir: id) =
   (*In a piggybacked response, the Message ID of the Confirmable
        request and the Acknowledgement MUST match, and the tokens of the
        response and original request MUST match.
-
-
       ---> In a separate response, just the tokens of the response and original request MUST match. <---
        *)
   if resoption = CoAP_Option_OSCORE_Option_empty() then
@@ -174,7 +168,7 @@ let oscore_responder(IDri: id) =
   get unique_ivs(partial:iv) suchthat partial = partial_iv in event PartialIvReplay(partial_iv) else
   (*keep track of used unique_ivs*)
   insert unique_ivs(partial_iv);
-  
+
   (*************************)
   (*  Response Generation  *)
   (*************************)
@@ -190,13 +184,15 @@ let oscore_responder(IDri: id) =
   new responseMessageId : CoAP_messageID;
   let header = Header(CoAP_versionOne(),  CoAP_nonConfirm(), CoAP_tokenLength(token), responseDummyCode, responseMessageId) in
   let request = Request(header, token, OSCORE_OPTION, payload_from_ciphertext(ciphertext)) in
-  out(c, request);
   event respondFinish(partial_iv);
-  event endBparam(IDri).
+  event endBparam(IDri);
+  out(c, request).
 
 query Kir:key; attacker(new payload) ==> event (Reveal(Kir)).
 query CommonIv:iv; attacker(new payload) ==> event (IvReveal(CommonIv)).
-query partialiv:iv; inj-event (PartialIvReplay(partialiv)) ==> event(respondFinish(partialiv)).
+query partialiv:iv; event (PartialIvReplay(partialiv)) ==> event(respondFinish(partialiv)).
+query x: id; event(endBparam(x)) ==> event(beginBparam(x)).
+query x: id; inj-event(endAparam(x)) ==> inj-event(beginAparam(x)).
 
 query event(here).
 
@@ -215,4 +211,4 @@ process
   new IDir:id; new IDri:id; new MasterSecret : master_secret;
   out(c, (IDir, IDri));
   insert security_context_lookup(IDir, IDri, MasterSecret);
-  (!oscore_initiator(IDir)) | (!oscore_responder(IDri)) | (!init)
+  (!oscore_initiator(IDir)) | (oscore_responder(IDri)) | (!init)
