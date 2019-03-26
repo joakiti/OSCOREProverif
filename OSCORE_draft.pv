@@ -198,16 +198,9 @@ query partialiv:iv; event (PartialIvReplay(partialiv)) ==> event(respondFinish(p
 
 query event(here).
 
-let init =
-  new Kir: key; new IDir:id; new Kri: key; new IDri:id; new CommonIv:iv; new MasterSecret : master_secret;
-  out(c, (IDir, IDri));
-  insert security_context_lookup(IDir, IDri, MasterSecret);
-  insert context(Kir, IDir, Kri, IDri, CommonIv);
-  (
-      (event Reveal(Kir); out(c, Kir)) |
-      (event Reveal(Kri); out(c, Kri)) |
-      (event IvReveal(CommonIv); out(c, CommonIv))
-  ).
+let init(idA:id,idB:id) =
+  in(c, (Kir: key, IDir:id, Kri: key, IDri:id, MasterSecret : master_secret));
+  if IDir <> idA && IDri <> idB then insert security_context_lookup(IDir, IDri, MasterSecret).
 
 process
   new IDir:id; new IDri:id; new MasterSecret : master_secret;
@@ -216,7 +209,7 @@ process
   let Kri = derive_key(MasterSecret, IDri, default_aead_algorithm()) in
   out(c, (IDir, IDri));
   insert security_context_lookup(IDir, IDri, MasterSecret);
-  (!oscore_initiator(IDir)) | (oscore_responder(IDri)) | (!init) |   (
+  (!oscore_initiator(IDir)) | (oscore_responder(IDri)) | (!init(IDir,IDri)) |   (
         (event Reveal(Kir); out(c, Kir)) |
         (event Reveal(Kri); out(c, Kri)) |
         (event IvReveal(CommonIv); out(c, CommonIv))
