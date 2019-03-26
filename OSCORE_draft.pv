@@ -60,6 +60,7 @@ event IvReveal(iv).
 event PartialIvReplay(iv).
 event here.
 event respondFinish(iv).
+event partialIvAccepted(iv).
 event beginAparam(id).
 event endAparam(id).
 event beginBparam(id).
@@ -149,7 +150,6 @@ let oscore_responder(IDri: id) =
   let Header(version, confirmCode, tlength, requestCode, messageId) = reqheader in
   let CoAP_Option_OSCORE_Option(partial_iv, kid) = option in
   event beginAparam(kid); (*Event that protocol started in processB *)
-
   let payload_from_ciphertext(p) = payload in
   (*Decompress the COSE Object. TODO: Implement decompression?*)
   (*KEY + COMMON_IV*)
@@ -163,9 +163,9 @@ let oscore_responder(IDri: id) =
   let aeadnonce = aead_nonce(kid, CommonIv, partial_iv) in
   (*Decrypt the COSE object*)
   let (rcode : CoAP_MessageCode, decryptedPayload : CoAP_payload) = dec_COSE_ciphertext(p, Kir, aeadnonce, aad) in
-
   (*If we get the same we execute partialreplay event, otherwise, we continue.*)
   get unique_ivs(partial:iv) suchthat partial = partial_iv in event PartialIvReplay(partial_iv) else
+  event partialIvAccepted(partial_iv);
   (*keep track of used unique_ivs*)
   insert unique_ivs(partial_iv);
 
@@ -184,7 +184,6 @@ let oscore_responder(IDri: id) =
   new responseMessageId : CoAP_messageID;
   let header = Header(CoAP_versionOne(),  CoAP_nonConfirm(), CoAP_tokenLength(token), responseDummyCode, responseMessageId) in
   let request = Request(header, token, OSCORE_OPTION, payload_from_ciphertext(ciphertext)) in
-  event respondFinish(partial_iv);
   event endBparam(IDri);
   out(c, request).
 
@@ -194,7 +193,8 @@ query x: id, CommonIv:iv, Kir:key; event(endBparam(x)) ==> (event(beginBparam(x)
 query x: id, CommonIv:iv, Kir:key; event(endAparam(x)) ==> (event(beginAparam(x)) || event(IvReveal(CommonIv)) || event(Reveal(Kir))).
 
 (*This query is acting weird, ask Alessandro:*)
-query partialiv:iv; event (PartialIvReplay(partialiv)) ==> event(respondFinish(partialiv)).
+(*Got it working, but still.. is it sound?*)
+query partialiv:iv; event (PartialIvReplay(partialiv)) ==> event(partialIvAccepted(partialiv)).
 
 query event(here).
 
@@ -209,7 +209,7 @@ process
   let Kri = derive_key(MasterSecret, IDri, default_aead_algorithm()) in
   out(c, (IDir, IDri));
   insert security_context_lookup(IDir, IDri, MasterSecret);
-  (!oscore_initiator(IDir)) | (oscore_responder(IDri)) | (!init(IDir,IDri)) |   (
+  (!oscore_initiator(IDir)) | (!oscore_responder(IDri)) | (!init(IDir,IDri)) |   (
         (event Reveal(Kir); out(c, Kir)) |
         (event Reveal(Kri); out(c, Kri)) |
         (event IvReveal(CommonIv); out(c, CommonIv))
