@@ -200,7 +200,7 @@ query event(here).
 
 let init(idA:id,idB:id) =
   in(c, (Kir: key, IDir:id, Kri: key, IDri:id, MasterSecret : master_secret));
-  if IDir <> idA && IDri <> idB then insert security_context_lookup(IDir, IDri, MasterSecret).
+  insert security_context_lookup(IDir, IDri, MasterSecret).
 
 process
   new IDir:id; new IDri:id; new MasterSecret : master_secret;
