@@ -202,8 +202,8 @@ let oscore_responder(IDri: id) =
 
 query Kir:key; attacker(new payload) ==> event (Reveal(Kir)).
 query CommonIv:iv; attacker(new payload) ==> event (IvReveal(CommonIv)).
-query x: id, CommonIv:iv, Kir:key; event(endBparam(x)) ==> (event(beginBparam(x)) || event(IvReveal(CommonIv)) || event(Reveal(Kir))).
-query x: id, CommonIv:iv, Kir:key; event(endAparam(x)) ==> (event(beginAparam(x)) || event(IvReveal(CommonIv)) || event(Reveal(Kir))).
+query x: id, CommonIv:iv, Kir:key; inj-event(endBparam(x)) ==> (inj-event(beginBparam(x)) || event(IvReveal(CommonIv)) || event(Reveal(Kir))).
+query x: id, CommonIv:iv, Kir:key; inj-event(endAparam(x)) ==> (inj-event(beginAparam(x)) || event(IvReveal(CommonIv)) || event(Reveal(Kir))).
 
 (*This query is acting weird, ask Alessandro:*)
 (*Got it working, but still.. is it sound?*)
