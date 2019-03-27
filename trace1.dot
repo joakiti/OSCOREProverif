@@ -1,0 +1,201 @@
+digraph {
+graph [ordering = out]
+edge [arrowhead = none, penwidth = 1.6, fontsize = 30]
+node [shape = point, width = 0, height = 0, fontsize = 30]
+Trace [label = <A trace has been found.<br/>
+>, shape = plaintext]
+P0__0 [label = "Honest Process", shape = plaintext]
+P__0 [label = "Attacker", shape = plaintext]
+Trace -> P0__0 [label = "", style = invisible, weight = 100]{rank = same; P0__0 P__0}
+P0__0 -> P0__1 [label = <>, weight = 100]
+P0__1 -> P0__2 [label = <>, weight = 100]
+P0__2 [shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"> <TR><TD><FONT COLOR="darkgreen">{1}</FONT><FONT COLOR="blue">new </FONT>IDir_3280</TD></TR><TR><TD><FONT COLOR="darkgreen">{2}</FONT><FONT COLOR="blue">new </FONT>IDri_3305</TD></TR><TR><TD><FONT COLOR="darkgreen">{3}</FONT><FONT COLOR="blue">new </FONT>MasterSecret_3338</TD></TR><TR><TD><FONT COLOR="darkgreen">{4}</FONT><FONT COLOR="blue">new </FONT>idcontext_3306</TD></TR></TABLE>>]
+P0__2 -> P0__3 [label = <>, weight = 100]
+P0__3 -> P0__4 [label = <>, weight = 100]
+P__0 -> P__1 [label = <>, weight = 100]
+{rank = same; P__1 P0__4}
+P0__4 -> P0__5 [label = <>, weight = 100]
+P__1 -> P__2 [label = <>, weight = 100]
+{rank = same; P__2 P0__5}
+P0__5 -> P__2 [label = <(~M_3340,~M_3341,~M_3342) = (IDir_3280,IDri_3305,<br/>
+idcontext_3306)>, arrowhead = normal]
+P0__5 -> P0__6 [label = <>, weight = 100]
+P__2 -> P__3 [label = <>, weight = 100]
+{rank = same; P__3 P0__6}
+P0__6 -> P0__7 [label = <>, weight = 100]
+P0__7 [shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"> <TR><TD><FONT COLOR="darkgreen">{6}</FONT><FONT COLOR="blue">insert </FONT>security_context_lookup(IDir_3280,IDri_3305,<br/>
+MasterSecret_3338,idcontext_3306)</TD></TR></TABLE>>]
+P0__7 -> P0__8 [label = <>, weight = 100]
+P__3 -> P__4 [label = <>, weight = 100]
+{rank = same; P__4 P0__7}
+/*RPar */
+P0__8 -> P0_3__8 [label = <>]
+P0__8 -> P0_2__8 [label = <>]
+P0__8 -> P0_1__8 [label = <>]
+P0__8 -> P0_0__8 [label = <>]
+P0__8 [label = "", fixedsize = false, width = 0, height = 0, shape = none]
+{rank = same; P0_0__8 P0_1__8 P0_2__8 P0_3__8}
+/*RPar */
+P0_0__8 -> P0_0_2__8 [label = <>]
+P0_0__8 -> P0_0_1__8 [label = <>]
+P0_0__8 -> P0_0_0__8 [label = <>]
+P0_0__8 [label = "", fixedsize = false, width = 0, height = 0, shape = none]
+{rank = same; P0_0_0__8 P0_0_1__8 P0_0_2__8}
+P0_0_0__8 -> P0_0_0__9 [label = <>, weight = 100]
+P0_0_0__9 [shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"> <TR><TD><FONT COLOR="darkgreen">{86}</FONT><FONT COLOR="blue">event</FONT> IvReveal(derive_common_iv_context(MasterSecret_3338,<br/>
+idcontext_3306,default_aead_algorithm))</TD></TR></TABLE>>]
+P0_0_0__9 -> P0_0_0__10 [label = <>, weight = 100]
+P0_0_0__10 -> P0_0_0__11 [label = <>, weight = 100]
+P__4 -> P__5 [label = <>, weight = 100]
+{rank = same; P__5 P0_0_0__11}
+P0_0_0__11 -> P0_0_0__12 [label = <>, weight = 100]
+P__5 -> P__6 [label = <>, weight = 100]
+{rank = same; P__6 P0_0_0__12}
+P0_0_0__12 -> P__6 [label = <~M_3347 = derive_common_iv_context(MasterSecret_3338,<br/>
+idcontext_3306,default_aead_algorithm)>, arrowhead = normal]
+P0_0_0__12 -> P0_0_0__13 [label = <>, weight = 100]
+P__6 -> P__7 [label = <>, weight = 100]
+{rank = same; P__7 P0_0_0__13}
+P0_0_0__14 [label = "", width = 0.3, height = 0.3]
+P0_0_0__13 -> P0_0_0__14 [label = <>, weight = 100]
+P0_0_1__9 [label = "", width = 0.3, height = 0.3]
+P0_0_1__8 -> P0_0_1__9 [label = <>, weight = 100]
+P0_0_2__9 [label = "", width = 0.3, height = 0.3]
+P0_0_2__8 -> P0_0_2__9 [label = <>, weight = 100]
+P0_1__8 [label = "!", shape = ellipse]
+P0_1_0__8 [label = "", fixedsize = false, width = 0, height = 0, shape = none]
+P0_1__8 -> P0_1_0__8 [label = <>, weight = 100]
+P0_1_0__8 -> P0_1_0__9 [label = <>, weight = 100]
+P0_1_0__9 [shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"> <TR><TD>Beginning of process <FONT COLOR="darkgreen">init</FONT>(IDir_3280, IDri_3305)<br/>
+</TD></TR></TABLE>>]
+P0_1_0__9 -> P0_1_0__10 [label = <>, weight = 100]
+P0_2__8 [label = "!", shape = ellipse]
+P0_3__8 [label = "!", shape = ellipse]
+P0_3_0__8 [label = "", fixedsize = false, width = 0, height = 0, shape = none]
+P0_3__8 -> P0_3_0__8 [label = <>, weight = 100]
+P0_3_0__8 -> P0_3_0__9 [label = <>, weight = 100]
+P0_3_0__9 [shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"> <TR><TD>Beginning of process <FONT COLOR="darkgreen">oscore_initiator</FONT>(IDir_3280)<br/>
+</TD></TR></TABLE>>]
+P0_3_0__9 -> P0_3_0__10 [label = <>, weight = 100]
+P0_3_0__10 -> P0_3_0__11 [label = <>, weight = 100]
+P0_2__9 [label = "", style = invisible]
+P0_2__8 -> P0_2__9 [label = <>, weight = 100, style = invisible]
+P0_1_0__10 -> P0_1_0__11 [label = <>, weight = 100]
+P0_0_2__10 [label = "", style = invisible]
+P0_0_2__9 -> P0_0_2__10 [label = <>, weight = 100, style = invisible]
+P0_0_1__10 [label = "", style = invisible]
+P0_0_1__9 -> P0_0_1__10 [label = <>, weight = 100, style = invisible]
+P0_0_0__15 [label = "", style = invisible]
+P0_0_0__14 -> P0_0_0__15 [label = <>, weight = 100, style = invisible]
+P__7 -> P__8 [label = <>, weight = 100]
+{rank = same; P__8 P0_0_0__15 P0_0_1__10 P0_0_2__10 P0_1_0__11 P0_2__9 P0_3_0__11}
+P0_3_0__11 -> P0_3_0__12 [label = <>, weight = 100]
+P__8 -> P__9 [label = <>, weight = 100]
+{rank = same; P__9 P0_3_0__12}
+P0_3_0__12 -> P__9 [label = <(a_3274,a_3273)>, dir = back, arrowhead = normal]
+P0_3_0__12 -> P0_3_0__13 [label = <>, weight = 100]
+P0_2__10 [label = "", style = invisible]
+P0_2__9 -> P0_2__10 [label = <>, weight = 100, style = invisible]
+P0_1_0__11 -> P0_1_0__12 [label = <>, weight = 100]
+P0_0_2__11 [label = "", style = invisible]
+P0_0_2__10 -> P0_0_2__11 [label = <>, weight = 100, style = invisible]
+P0_0_1__11 [label = "", style = invisible]
+P0_0_1__10 -> P0_0_1__11 [label = <>, weight = 100, style = invisible]
+P0_0_0__16 [label = "", style = invisible]
+P0_0_0__15 -> P0_0_0__16 [label = <>, weight = 100, style = invisible]
+P__9 -> P__10 [label = <>, weight = 100]
+{rank = same; P__10 P0_0_0__16 P0_0_1__11 P0_0_2__11 P0_1_0__12 P0_2__10 P0_3_0__13}
+P0_3_0__13 -> P0_3_0__14 [label = <>, weight = 100]
+P0_3_0__14 [shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"> <TR><TD><FONT COLOR="darkgreen">{9}</FONT><FONT COLOR="blue">event</FONT> beginBparam(a_3274)</TD></TR></TABLE>>]
+P0_3_0__14 -> P0_3_0__15 [label = <>, weight = 100]
+P0_1_0__12 -> P0_1_0__13 [label = <>, weight = 100]
+P0_0_2__12 [label = "", style = invisible]
+P0_0_2__11 -> P0_0_2__12 [label = <>, weight = 100, style = invisible]
+P0_0_1__12 [label = "", style = invisible]
+P0_0_1__11 -> P0_0_1__12 [label = <>, weight = 100, style = invisible]
+P0_0_0__17 [label = "", style = invisible]
+P0_0_0__16 -> P0_0_0__17 [label = <>, weight = 100, style = invisible]
+P__10 -> P__11 [label = <>, weight = 100]
+{rank = same; P__11 P0_0_0__17 P0_0_1__12 P0_0_2__12 P0_1_0__13}
+P0_1_0__13 -> P0_1_0__14 [label = <>, weight = 100]
+P__11 -> P__12 [label = <>, weight = 100]
+{rank = same; P__12 P0_1_0__14}
+P0_1_0__14 -> P__12 [label = <(a_3276,~M_3340,a_3277,a_3274,a,a_3273) = (a_3276,<br/>
+IDir_3280,a_3277,a_3274,a,a_3273)>, dir = back, arrowhead = normal]
+P0_1_0__14 -> P0_1_0__15 [label = <>, weight = 100]
+P0_0_2__13 [label = "", style = invisible]
+P0_0_2__12 -> P0_0_2__13 [label = <>, weight = 100, style = invisible]
+P0_0_1__13 [label = "", style = invisible]
+P0_0_1__12 -> P0_0_1__13 [label = <>, weight = 100, style = invisible]
+P0_0_0__18 [label = "", style = invisible]
+P0_0_0__17 -> P0_0_0__18 [label = <>, weight = 100, style = invisible]
+P__12 -> P__13 [label = <>, weight = 100]
+{rank = same; P__13 P0_0_0__18 P0_0_1__13 P0_0_2__13 P0_1_0__15}
+P0_1_0__15 -> P0_1_0__16 [label = <>, weight = 100]
+P0_1_0__16 [shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"> <TR><TD><FONT COLOR="darkgreen">{78}</FONT><FONT COLOR="blue">insert </FONT>security_context_lookup(IDir_3280,a_3274,<br/>
+a,a_3273)</TD></TR></TABLE>>]
+P0_1_0__16 -> P0_1_0__17 [label = <>, weight = 100]
+P__13 -> P__14 [label = <>, weight = 100]
+{rank = same; P__14 P0_1_0__16}
+P0_1_0__18 [label = "", width = 0.3, height = 0.3]
+P0_1_0__17 -> P0_1_0__18 [label = <>, weight = 100]
+P0_3_0__15 -> P0_3_0__16 [label = <>, weight = 100]
+P0_3_0__16 [shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"> <TR><TD><FONT COLOR="darkgreen">{42}</FONT><FONT COLOR="blue">get </FONT>security_context_lookup(IDir_3280,a_3274,<br/>
+a,a_3273)</TD></TR><TR><TD><FONT COLOR="darkgreen">{13}</FONT><FONT COLOR="blue">new </FONT>token_3282</TD></TR><TR><TD><FONT COLOR="darkgreen">{14}</FONT><FONT COLOR="blue">new </FONT>partial_iv_3281</TD></TR><TR><TD><FONT COLOR="darkgreen">{19}</FONT><FONT COLOR="blue">new </FONT>messageID_3283</TD></TR><TR><TD><FONT COLOR="darkgreen">{20}</FONT><FONT COLOR="blue">new </FONT>payload_3279</TD></TR></TABLE>>]
+P0_3_0__16 -> P0_3_0__17 [label = <>, weight = 100]
+P__14 -> P__15 [label = <>, weight = 100]
+{rank = same; P__15 P0_3_0__16}
+P0_3_0__17 -> P0_3_0__18 [label = <>, weight = 100]
+P0_2__11 [label = "", style = invisible]
+P0_2__10 -> P0_2__11 [label = <>, weight = 100, style = invisible]
+P0_1_0__19 [label = "", style = invisible]
+P0_1_0__18 -> P0_1_0__19 [label = <>, weight = 100, style = invisible]
+P0_0_2__14 [label = "", style = invisible]
+P0_0_2__13 -> P0_0_2__14 [label = <>, weight = 100, style = invisible]
+P0_0_1__14 [label = "", style = invisible]
+P0_0_1__13 -> P0_0_1__14 [label = <>, weight = 100, style = invisible]
+P0_0_0__19 [label = "", style = invisible]
+P0_0_0__18 -> P0_0_0__19 [label = <>, weight = 100, style = invisible]
+P__15 -> P__16 [label = <>, weight = 100]
+{rank = same; P__16 P0_0_0__19 P0_0_1__14 P0_0_2__14 P0_1_0__19 P0_2__11 P0_3_0__18}
+P0_3_0__18 -> P0_3_0__19 [label = <>, weight = 100]
+P__16 -> P__17 [label = <>, weight = 100]
+{rank = same; P__17 P0_3_0__19}
+P0_3_0__19 -> P__17 [label = <~X_1>, arrowhead = normal]
+P0_3_0__19 -> P0_3_0__20 [label = <>, weight = 100]
+P0_2__12 [label = "", style = invisible]
+P0_2__11 -> P0_2__12 [label = <>, weight = 100, style = invisible]
+P0_1_0__20 [label = "", style = invisible]
+P0_1_0__19 -> P0_1_0__20 [label = <>, weight = 100, style = invisible]
+P0_0_2__15 [label = "", style = invisible]
+P0_0_2__14 -> P0_0_2__15 [label = <>, weight = 100, style = invisible]
+P0_0_1__15 [label = "", style = invisible]
+P0_0_1__14 -> P0_0_1__15 [label = <>, weight = 100, style = invisible]
+P0_0_0__20 [label = "", style = invisible]
+P0_0_0__19 -> P0_0_0__20 [label = <>, weight = 100, style = invisible]
+P__17 -> P__18 [label = <>, weight = 100]
+{rank = same; P__18 P0_0_0__20 P0_0_1__15 P0_0_2__15 P0_1_0__20 P0_2__12 P0_3_0__20}
+P0_3_0__20 -> P0_3_0__21 [label = <>, weight = 100]
+P0_3_0__21 [shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"> <TR><TD><FONT COLOR="darkgreen">{31}</FONT><FONT COLOR="blue">event</FONT> here</TD></TR></TABLE>>]
+P0_3_0__21 -> P0_3_0__22 [label = <>, weight = 100]
+P__18 -> P__19 [label = <>, weight = 100]
+P__19 [color = red, shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"> <TR><TD>The attacker has the message 2-proj-2-tuple(dec_COSE_ciphertext_no_ad(<br/>
+~M_3834,derive_key_context(a,~M_3340,default_aead_algorithm,<br/>
+a_3273),aead_nonce(~M_3340,derive_common_iv_context(<br/>
+a,a_3273,default_aead_algorithm),~M_3835))) = <br/>
+payload_3279</TD></TR></TABLE>>]
+P__19 -> P__20 [label = <>, weight = 100]
+Abbrev [shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR> <TD> Abbreviations </TD></TR><TR><TD>~X_1 = Request(Header(~M_3838,~M_3839,~M_3840,~M_3841,<br/>
+~M_3842),~M_3831,CoAP_Option_OSCORE_Option_context(<br/>
+~M_3835,~M_3836,~M_3837),payload_from_ciphertext(<br/>
+~M_3834))<br/>
+= Request(Header(CoAP_versionOne,CoAP_nonConfirm,<br/>
+CoAP_tokenLength(token_3282),CoAP_GETCode,messageID_3283),<br/>
+token_3282,CoAP_Option_OSCORE_Option_context(partial_iv_3281,<br/>
+IDir_3280,a_3273),payload_from_ciphertext(enc_COSE_ciphertext(<br/>
+derive_key_context(a,IDir_3280,default_aead_algorithm,<br/>
+a_3273),aead_nonce(IDir_3280,derive_common_iv_context(<br/>
+a,a_3273,default_aead_algorithm),partial_iv_3281),<br/>
+(CoAP_POSTCode,payload_3279),AAD(encrypt0_context,<br/>
+encrypt0(oscore_version_one,default_aead_algorithm,<br/>
+IDir_3280,partial_iv_3281)))))</TD></TR></TABLE>>]Abbrev -> P__0 [style = invisible, weight =100]}

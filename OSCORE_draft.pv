@@ -22,6 +22,8 @@ type id. (* Initiator / Responder ID, aka. KID *)
 type key. (* Initiator / Responder key*)
 type nonce. (* AEAD Nonce *)
 type additional_data. (* Additional data for AEAD *)
+type encrypt0_structure.
+type external_aad.
 type iv. (*Common IV or Partial IV*)
 type master_secret.
 type aead_algorithm.
@@ -53,9 +55,14 @@ fun Request(CoAP_header, CoAP_token, CoAP_option, CoAP_payload) : CoAP_Message[d
 (* Default options. TODO: Delete? *)
 fun oscore_version_one() : oscore_version.
 fun default_aead_algorithm(): aead_algorithm.
+fun encrypt0_context(): bitstring.
 
-
-fun AAD(oscore_version, aead_algorithm, id, iv) : additional_data[data].
+(*
+Note that the AAD consists of a fixed string of 11 bytes concatenated
+with the external_aad.
+*)
+fun encrypt0(oscore_version, aead_algorithm, id, iv) : external_aad[data].
+fun AAD(bitstring, external_aad) : additional_data[data].
 (*Sender ID, CommonIV, PartialIV*)
 fun aead_nonce(id, iv, iv) : nonce.
 
@@ -78,11 +85,7 @@ fun generateResponsePayload(CoAP_MessageCode, CoAP_payload): CoAP_payload.
 fun generateResponseCode(CoAP_MessageCode, CoAP_payload): CoAP_MessageCode.
 
 (*
-The ID Context, Sender ID, and Partial IV are always at least
-implicitly integrity protected, as manipulation leads to the wrong
-nonce or key being used and therefore results in decryption failure.
-
-E.g i dont think we can have the no_ad function
+Have we understood this correctly that it is possible to decrypt the plaintext without using add?
 *)
 reduc forall k:key, n:nonce, plain: bitstring, add:additional_data;
   dec_COSE_ciphertext(enc_COSE_ciphertext(k,n,plain,add), k, n, add) = plain.
@@ -112,11 +115,11 @@ I need help verifying that a replay attack can happen, because it should be able
 
 I need help creating the single security context deriviation - it relies on restoring the sender sequence number.
 
-(*In a piggybacked response, the Message ID of the Confirmable
-     request and the Acknowledgement MUST match, and the tokens of the
-     response and original request MUST match.
+In a piggybacked response, the Message ID of the Confirmable
+request and the Acknowledgement MUST match, and the tokens of the
+response and original request MUST match.
     ---> In a separate response, just the tokens of the response and original request MUST match. <---
-                  What we have now^ should we consider doing piggybacked ACK responses? I dont think they will make a difference for OSCORE.
+What we have now^ should we consider doing piggybacked ACK responses? I dont think they will make a difference for OSCORE.
      *)
 table security_context_lookup(id, id, master_secret, id_context).
 table context(key, id, key, id, iv).
@@ -125,9 +128,9 @@ table unique_ivs(iv).
 fun COSE(iv, id, COSE_ciphertext): COSEObject[data].
 
 let oscore_initiator(IDir: id) =
-  in(c, IDri: id); (*Receive our endpoint from somewhere*)
+  in(c, (IDri: id, idcontext:id_context)); (*Receive our endpoint from somewhere*)
   event beginBparam(IDri); (*Begin event that some host has been accepted, possibly B.*)
-  get security_context_lookup(=IDir, =IDri, msecret:master_secret, idcontext:id_context) in (*Find a security context with endpoint*)
+  get security_context_lookup(=IDir, =IDri, msecret:master_secret, =idcontext) in (*Find a security context with endpoint*)
   let CommonIv = derive_common_iv_context(msecret, idcontext, default_aead_algorithm()) in
   let Kir = derive_key_context(msecret, IDir, default_aead_algorithm(), idcontext) in
   let Kri = derive_key_context(msecret, IDri, default_aead_algorithm(), idcontext) in
@@ -139,7 +142,7 @@ let oscore_initiator(IDir: id) =
   let rcode = CoAP_POSTCode() in
   new messageID : CoAP_messageID;
   new payload : CoAP_payload;
-  let aad = AAD(oscore_version_one(), default_aead_algorithm(), IDir, partial_iv) in
+  let aad = AAD(encrypt0_context(), encrypt0(oscore_version_one(), default_aead_algorithm(), IDir, partial_iv)) in
   let secret_plaintext = (rcode, payload) in (*This early draft assumes no Class E option*)
   (*We compute the AEAD nonce from sender_id, common_iv, and the partial iv(which is apparently just the sender sequence number)*)
   let aeadnonce = aead_nonce(IDir, CommonIv, partial_iv) in
@@ -156,19 +159,20 @@ let oscore_initiator(IDir: id) =
   let request = Request(header, token, OSCORE_OPTION, payload_from_ciphertext(ciphertext)) in
   out(c, request);
   (*Receive a response*)
+  event here;
   in(c, response:CoAP_Message);
   let Request(resheader, restoken, resoption, respayload) = response in
   let Header(resversion, resconfirmCode, restlength, resrequestCode, resmessageId) = resheader in
   if restoken = token then (*Bind response to request*)
   if resoption = CoAP_Option_OSCORE_Option_empty() then
-  let responseAad = AAD(oscore_version_one(), default_aead_algorithm(), IDri, partial_iv) in
+  let responseAad = AAD(encrypt0_context, encrypt0(oscore_version_one(), default_aead_algorithm(), IDri, partial_iv)) in
   let payload_from_ciphertext(p) = respayload in
   let (rescode : CoAP_MessageCode, decryptedPayload : CoAP_payload) = dec_COSE_ciphertext(p, Kri, aeadnonce, responseAad) in
   event endAparam(IDir);
   event here;
   0.
 
-let oscore_responder(IDri: id) =
+let oscore_responder(IDri: id, IDir: id) =
   (************************)
   (*  Verifying request   *)
   (************************)
@@ -185,7 +189,7 @@ let oscore_responder(IDri: id) =
   let Kir = derive_key_context(msecret, kid, default_aead_algorithm(), idcontext) in
   let Kri = derive_key_context(msecret, IDri, default_aead_algorithm(), idcontext) in
   (*Compose AAD*)
-  let aad = AAD(oscore_version_one(), default_aead_algorithm(), kid, partial_iv) in
+  let aad = AAD(encrypt0_context, encrypt0(oscore_version_one(), default_aead_algorithm(), kid, partial_iv)) in
   (*Compute the AEAD Nonce*)
   let aeadnonce = aead_nonce(kid, CommonIv, partial_iv) in
   (*Decrypt the COSE object*)
@@ -202,7 +206,7 @@ let oscore_responder(IDri: id) =
   let responsePayload = generateResponsePayload(rcode, decryptedPayload) in
   let responseCode = generateResponseCode(rcode, decryptedPayload) in
   let response_secret_plaintext = (responseCode, responsePayload) in (*This early draft assumes no Class E option*)
-  let responseAad = AAD(oscore_version_one(), default_aead_algorithm(), IDri, partial_iv) in
+  let responseAad = AAD(encrypt0_context, encrypt0(oscore_version_one(), default_aead_algorithm(), IDri, partial_iv)) in
   let ciphertext = enc_COSE_ciphertext(Kri, aeadnonce, response_secret_plaintext, responseAad) in
   let COSEobject = COSE(partial_iv, IDri, ciphertext) in
   (*We use the AEAD nonce from the request.*)
@@ -211,7 +215,8 @@ let oscore_responder(IDri: id) =
   new responseMessageId : CoAP_messageID;
   let header = Header(CoAP_versionOne(),  CoAP_nonConfirm(), CoAP_tokenLength(token), responseDummyCode, responseMessageId) in
   let request = Request(header, token, OSCORE_OPTION, payload_from_ciphertext(ciphertext)) in
-  event endBparam(IDri);
+  if kid = IDir then
+    event endBparam(IDri);
   out(c, request).
 
 let generate_new_security_context_initiator(IDir: id) =
@@ -230,15 +235,18 @@ query partialiv:iv; event (PartialIvReplay(partialiv)) ==> event(partialIvAccept
 
 query event(here).
 
-let init(notToBeOverwritten:id_context) =
+(*This process allows security contexts to be derived where the security context is not derived by processes themself.
+  E.g
+*)
+let init(IDirA:id,IDriB:id) =
   in(c, (Kir: key, IDir:id, Kri: key, IDri:id, MasterSecret : master_secret, idcontext:id_context));
-  if idcontext <> notToBeOverwritten then insert security_context_lookup(IDir, IDri, MasterSecret, idcontext).
+  if IDirA <> IDir || IDriB <> IDri then insert security_context_lookup(IDir, IDri, MasterSecret, idcontext).
 
 process
   new IDir:id; new IDri:id; new MasterSecret : master_secret; new idcontext: id_context;
-  out(c, (IDir, IDri));
+  out(c, (IDir, IDri, idcontext));
   insert security_context_lookup(IDir, IDri, MasterSecret, idcontext);
-  (!oscore_initiator(IDir)) | (!oscore_responder(IDri)) | (!init(idcontext)) |   (
+  (!oscore_initiator(IDir)) | (!oscore_responder(IDri, IDir)) | (!init(IDir, IDri)) |   (
     let CommonIv = derive_common_iv_context(MasterSecret, idcontext, default_aead_algorithm()) in
     let Kir = derive_key_context(MasterSecret, IDir, default_aead_algorithm(), idcontext) in
     let Kri = derive_key_context(MasterSecret, IDri, default_aead_algorithm(), idcontext) in
