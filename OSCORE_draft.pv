@@ -200,6 +200,10 @@ let oscore_responder(IDri: id) =
   event endBparam(IDri);
   out(c, request).
 
+let generate_new_security_context_initiator(IDir: id) =
+  (*Create the ID Context parameter*)
+
+
 query Kir:key; attacker(new payload) ==> event (Reveal(Kir)).
 query CommonIv:iv; attacker(new payload) ==> event (IvReveal(CommonIv)).
 query x: id, CommonIv:iv, Kir:key; inj-event(endBparam(x)) ==> (inj-event(beginBparam(x)) || event(IvReveal(CommonIv)) || event(Reveal(Kir))).
