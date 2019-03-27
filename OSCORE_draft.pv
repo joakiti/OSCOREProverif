@@ -85,7 +85,25 @@ reduc forall k:key, n:nonce, plain: bitstring, add:additional_data;
 reduc forall k:key, n:nonce, plain: bitstring, add:additional_data;
   dec_COSE_ciphertext_no_ad(enc_COSE_ciphertext(k,n,plain,add), k, n) = plain.
 
+(*
+To simplify retrieval of the right Recipient Context, the Recipient
+ID SHOULD be unique in the sets of all Recipient Contexts used by an
+endpoint.  If an endpoint has the same Recipient ID with different
+Recipient Contexts, i.e. the Recipient Contexts are derived from
+different Common Contexts, then the endpoint may need to try multiple
+times before verifying the right security context associated to the
+Recipient ID.
 
+Is this how it's done now? Can't really confirm
+
+It remains to prove that the nonces used by the fixed endpoint are unique. Interesting?
+
+(*In a piggybacked response, the Message ID of the Confirmable
+     request and the Acknowledgement MUST match, and the tokens of the
+     response and original request MUST match.
+    ---> In a separate response, just the tokens of the response and original request MUST match. <---
+                  What we have now^ should we consider doing piggybacked ACK responses? I dont think they will make a difference for OSCORE.
+     *)
 table security_context_lookup(id, id, master_secret).
 table context(key, id, key, id, iv).
 table unique_ivs(iv).
@@ -128,11 +146,6 @@ let oscore_initiator(IDir: id) =
   let Request(resheader, restoken, resoption, respayload) = response in
   let Header(resversion, resconfirmCode, restlength, resrequestCode, resmessageId) = resheader in
   if restoken = token then (*Bind response to request*)
-  (*In a piggybacked response, the Message ID of the Confirmable
-       request and the Acknowledgement MUST match, and the tokens of the
-       response and original request MUST match.
-      ---> In a separate response, just the tokens of the response and original request MUST match. <---
-       *)
   if resoption = CoAP_Option_OSCORE_Option_empty() then
   let responseAad = AAD(oscore_version_one(), default_aead_algorithm(), IDri, partial_iv) in
   let payload_from_ciphertext(p) = respayload in
@@ -200,7 +213,7 @@ query event(here).
 
 let init(idA:id,idB:id) =
   in(c, (Kir: key, IDir:id, Kri: key, IDri:id, MasterSecret : master_secret));
-  insert security_context_lookup(IDir, IDri, MasterSecret).
+  if IDir <> idA && IDri <> idB then insert security_context_lookup(IDir, IDri, MasterSecret).
 
 process
   new IDir:id; new IDri:id; new MasterSecret : master_secret;
