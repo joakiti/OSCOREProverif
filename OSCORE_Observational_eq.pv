@@ -139,7 +139,13 @@ let oscore_initiator(IDir: id) =
   let dummyCode = CoAP_GETCode() in
   (*The payload from the original CoAP message is encrypted in COSE and then added as payload*)
   let header = Header(version, confirm, tlength, dummyCode, messageID) in
-  let request = Request(header, token, OSCORE_OPTION, payload_from_ciphertext(ciphertext)) in
+  new rp: CoAP_payload;
+  new rrcode: CoAP_MessageCode;
+  let random_secret_plaintext = (rrcode, rp) in (*This early draft assumes no Class E option*)
+  let random_ciphertext = enc_COSE_ciphertext(Kir, aeadnonce, random_secret_plaintext, aad) in
+  let request = Request(header, token, OSCORE_OPTION, choice[payload_from_ciphertext(ciphertext), payload_from_ciphertext(random_ciphertext)]) in
+
+  out(c, request);
   (*Receive a response*)
   in(c, response:CoAP_Message);
   let Request(resheader, restoken, resoption, respayload) = response in
@@ -149,8 +155,6 @@ let oscore_initiator(IDir: id) =
   let responseAad = AAD(oscore_version_one(), default_aead_algorithm(), IDri, partial_iv) in
   let payload_from_ciphertext(p) = respayload in
   let (rescode : CoAP_MessageCode, decryptedPayload : CoAP_payload) = dec_COSE_ciphertext(p, Kri, aeadnonce, responseAad) in
-  event endAparam(IDir);
-  event here;
   0.
 
 let oscore_responder(IDri: id) =
@@ -161,7 +165,6 @@ let oscore_responder(IDri: id) =
   let Request(reqheader, token, option, payload) = req in
   let Header(version, confirmCode, tlength, requestCode, messageId) = reqheader in
   let CoAP_Option_OSCORE_Option(partial_iv, kid) = option in
-  event beginAparam(kid); (*Event that protocol started in processB *)
   let payload_from_ciphertext(p) = payload in
   (*Decompress the COSE Object. TODO: Implement decompression?*)
   (*KEY + COMMON_IV*)
@@ -204,16 +207,6 @@ let generate_new_security_context_initiator(IDir: id) =
   (*Create the ID Context parameter*)
 
 
-query Kir:key; attacker(new payload) ==> event (Reveal(Kir)).
-query CommonIv:iv; attacker(new payload) ==> event (IvReveal(CommonIv)).
-query x: id, CommonIv:iv, Kir:key; inj-event(endBparam(x)) ==> (inj-event(beginBparam(x)) || event(IvReveal(CommonIv)) || event(Reveal(Kir))).
-query x: id, CommonIv:iv, Kir:key; inj-event(endAparam(x)) ==> (inj-event(beginAparam(x)) || event(IvReveal(CommonIv)) || event(Reveal(Kir))).
-
-(*This query is acting weird, ask Alessandro:*)
-(*Got it working, but still.. is it sound?*)
-query partialiv:iv; event (PartialIvReplay(partialiv)) ==> event(partialIvAccepted(partialiv)).
-
-query event(here).
 
 let init(idA:id,idB:id) =
   in(c, (Kir: key, IDir:id, Kri: key, IDri:id, MasterSecret : master_secret));
@@ -226,8 +219,4 @@ process
   let Kri = derive_key(MasterSecret, IDri, default_aead_algorithm()) in
   out(c, (IDir, IDri));
   insert security_context_lookup(IDir, IDri, MasterSecret);
-  (!oscore_initiator(IDir)) | (!oscore_responder(IDri)) | (!init(IDir,IDri)) |   (
-        (event Reveal(Kir); out(c, Kir)) |
-        (event Reveal(Kri); out(c, Kri)) |
-        (event IvReveal(CommonIv); out(c, CommonIv))
-    )
+  (!oscore_initiator(IDir)) | (!oscore_responder(IDri)) | (!init(IDir,IDri))
