@@ -27,20 +27,27 @@ type additional_data. (* Additional data for AEAD *)
 type encrypt0_structure.
 type external_aad.
 type iv. (*Common IV or Partial IV*)
-type master_secret.
 type aead_algorithm.
 type oscore_version.
 type COSE_ciphertext.
-type id_context.
 
-fun derive_key(master_secret, id, aead_algorithm): key.
-fun derive_key_context(master_secret, id, aead_algorithm, id_context): key.
-fun derive_common_iv(master_secret, aead_algorithm): iv.
-fun derive_common_iv_context(master_secret, id_context, aead_algorithm): iv.
+
+free emptyIdContext: bitstring.
+free emptyId: id.
+free type_key: bitstring.
+free type_iv: bitstring.
+
+fun info(id, bitstring, aead_algorithm, bitstring, bitstring):bitstring[data].
+
+fun lengthOfKey(aead_algorithm): bitstring.
+
+fun prk_hmac_sha_256(bitstring, bitstring): bitstring.
+fun genKey(bitstring):key.
+fun genKey(bitstring):key.
 
 (*Options*)
 fun CoAP_Option_OSCORE_Option(iv, id) : CoAP_option[data].
-fun CoAP_Option_OSCORE_Option_context(iv, id, id_context) : CoAP_option[data].
+fun CoAP_Option_OSCORE_Option_context(iv, id, bitstring) : CoAP_option[data].
 fun CoAP_Option_OSCORE_Option_empty() : CoAP_option[data].
 free CoAP_EmptyOption : CoAP_option.
 
@@ -114,6 +121,8 @@ I need help verifying that a replay attack can happen, because it should be able
 
 I need help creating the single security context deriviation - it relies on restoring the sender sequence number.
 
+We need to take a look at the COSE structure
+
 I, am not entirely sure what the messaging layer means
 Since the message formats for CoAP over unreliable transport [RFC7252] and for CoAP over reliable transport [RFC8323]
 differ only in terms of CoAP Messaging Layer, OSCORE can be applied to both unreliable and reliable transports
@@ -127,7 +136,7 @@ response and original request MUST match.
     ---> In a separate response, just the tokens of the response and original request MUST match. <---
 What we have now^ should we consider doing piggybacked ACK responses? I dont think they will make a difference for OSCORE.
      *)
-table security_context_lookup(host, host, id, id, master_secret, id_context).
+table security_context_lookup(host, host, id, id, bitstring, bitstring).
 (*OSCORE requires that client and server establish a shared security
  context used to process the COSE objects.*)
 
@@ -154,19 +163,26 @@ let oscore_initiator(identity : host) =
   (* 1. Retrieve the Sender Context associated with the target resource. How is this done exactly?*)
   (* In this implementation, the "sender" has a table of hosts he can communicate with, they include id's, etc.*)
   event beginBparam(responder);
-  get security_context_lookup(=identity, =endpoint, IDir:id, IDri:id, msecret:master_secret, idcontext:id_context) in (*Find a security context with endpoint*)
+  get security_context_lookup(=identity, =endpoint, IDir:id, IDri:id, msecret:bitstring, msalt:bitstring, idcontext:bitstring) in (*Find a security context with endpoint*)
   (*
     An endpoint may free up memory by not storing the Common IV, Sender Key, and
     Recipient Key, deriving them when needed.
   *)
-  let CommonIv = derive_common_iv_context(msecret, idcontext, default_aead_algorithm) in
+  let commoniv = prk(prk_hmac_sha_256(msecret, msalt), info(emptyId, idcontext, default_aead_algorithm, type_iv, lengthOfKey(default_aead_algorithm))) in
   let Kir = derive_key_context(msecret, IDir, default_aead_algorithm, idcontext) in
   let Kri = derive_key_context(msecret, IDri, default_aead_algorithm, idcontext) in
   let version = CoAP_versionOne in let confirm = CoAP_nonConfirm in
   let tlength = CoAP_tokenLength(token) in let rcode = CoAP_POSTCode in
   (* 2. Compose the Additional Authenticated Data and the plaintext*)
+  (* AAD = Enc_structure = [ "Encrypt0", h’’, external_aad ]. Not sure what h'' is. *)
   let aad = AAD(encrypt0_context, encrypt0(oscore_version_one, default_aead_algorithm, IDir, partial_iv)) in
-  let secret_plaintext = (rcode, payload) in (*This early draft assumes no Class E option*)
+  (*
+  o the Code of the original CoAP message
+  o all Inner option message fields present in the original CoAP message
+  o the Payload of original CoAP message, if present, and in that case
+    prefixed by the one-byte Payload Marker (0xff).
+  *)
+  let secret_plaintext = (rcode, payload) in (*This early draft assumes no Class E option, and no prefix*)
 
   (* 3. Encode the Partial IV. (Sender sequence number). Compute
   the AEAD nonce from the Sender ID, Common IV, and Partial IV*)
@@ -208,7 +224,7 @@ let oscore_responder(identity : host) =
   let payload_from_ciphertext(p) = payload in
   (*Decompress the COSE Object. TODO: Implement decompression?*)
   (*KEY + COMMON_IV*)
-  get security_context_lookup(=identity, endpoint:host, IDri:id, =kid, msecret:master_secret, =idcontext) in (*Find a security context with endpoint*)
+  get security_context_lookup(=identity, endpoint:host, IDri:id, =kid, msecret:bitstring, msalt:bitstring, =idcontext) in (*Find a security context with endpoint*)
   event beginAparam(endpoint); (*Event that protocol started in processB *)
   let CommonIv = derive_common_iv_context(msecret, idcontext, default_aead_algorithm) in
   let Kir = derive_key_context(msecret, kid, default_aead_algorithm, idcontext) in
@@ -225,15 +241,14 @@ let oscore_responder(identity : host) =
   (*keep track of used unique_ivs*)
   insert unique_ivs(partial_iv);
 
-  (*************************)
-  (*  Response Generation  *)
-  (*************************)
+  (*Generate response*)
   let responsePayload = generateResponsePayload(rcode, decryptedPayload) in
   let responseCode = generateResponseCode(rcode, decryptedPayload) in
   let response_secret_plaintext = (responseCode, responsePayload) in (*This early draft assumes no Class E option*)
   let responseAad = AAD(encrypt0_context, encrypt0(oscore_version_one, default_aead_algorithm, IDri, partial_iv)) in
   let ciphertext = enc_COSE_ciphertext(Kri, aeadnonce, response_secret_plaintext, responseAad) in
   let COSEobject = COSE(partial_iv, IDri, ciphertext) in
+
   (*We use the AEAD nonce from the request.*)
   let responseDummyCode = CoAP_CHANGEDCode in
   let OSCORE_OPTION = CoAP_Option_OSCORE_Option_empty in
@@ -255,7 +270,7 @@ query x: host, CommonIv:iv, Kir:key; inj-event(endAparam(x)) ==> (inj-event(begi
 
 (*This query is acting weird, ask Alessandro:*)
 (*Got it working, but still.. is it sound?*)
-query partialiv:iv; event (PartialIvReplay(partialiv)) ==> event(partialIvAccepted(partialiv)).
+query partialiv:iv; event (PartialIvReplay(partialiv)) ==>  event(partialIvAccepted(partialiv)).
 
 query CommonIv:iv, Kir:key; event(here) ==> event(IvReveal(CommonIv)) || event(Reveal(Kir)).
 
@@ -263,19 +278,26 @@ query CommonIv:iv, Kir:key; event(here) ==> event(IvReveal(CommonIv)) || event(R
   E.g
 *)
 let init =
-  in(c, (IDri:id)).
+  in(c, (a: host, b: host, aid:id, bid:id, msecret: bitstring, msalt:bitstring, idcontext: bitstring));
+  if a <> initiator && b <> responder then
+    if b <> initiator && a <> responder then
+      insert security_context_lookup(a, b, aid, bid, msecret, msalt, idcontext);
+      insert security_context_lookup(b, a, bid, aid, msecret, msalt, idcontext).
+
 process
-  new IDir:id; new IDri:id; new MasterSecret : master_secret; new idcontext: id_context;
+  new IDir:id; new IDri:id; new MasterSecret : bitstring; new idcontext: bitstring; new MasterSalt:bitstring;
   out(c, idcontext);
   (*Consider a shared table where all users are well behaved, and ONLY reads rows which belongs to them*)
-  insert security_context_lookup(initiator, responder, IDir, IDri, MasterSecret, idcontext);
-  insert security_context_lookup(responder, initiator, IDri, IDir, MasterSecret, idcontext);
-
-  (!oscore_initiator(initiator)) | (!oscore_responder(responder)) | (!init) | (
-  let CommonIv = derive_common_iv_context(MasterSecret, idcontext, default_aead_algorithm) in
-  let Kir = derive_key_context(MasterSecret, IDir, default_aead_algorithm, idcontext) in
-  let Kri = derive_key_context(MasterSecret, IDri, default_aead_algorithm, idcontext) in
-    (event Reveal(Kir); out(c, Kir)) |
-    (event Reveal(Kri); out(c, Kri)) |
-    (event IvReveal(CommonIv); out(c, CommonIv))
-)
+  insert security_context_lookup(initiator, responder, IDir, IDri, MasterSecret, MasterSalt, idcontext);
+  insert security_context_lookup(responder, initiator, IDri, IDir, MasterSecret, MasterSalt, idcontext);
+  (*These are the actors in our model*)
+  (!oscore_initiator(initiator)) | (!oscore_responder(responder)) | (!init) |
+  (
+    (*What if the attacker has the keys, can he get the payload?*)
+    let CommonIv = derive_common_iv_context(MasterSecret, idcontext, default_aead_algorithm) in
+    let Kir = derive_key_context(MasterSecret, IDir, default_aead_algorithm, idcontext) in
+    let Kri = derive_key_context(MasterSecret, IDri, default_aead_algorithm, idcontext) in
+      (event Reveal(Kir); out(c, Kir)) |
+      (event Reveal(Kri); out(c, Kri)) |
+      (event IvReveal(CommonIv); out(c, CommonIv))
+  )
