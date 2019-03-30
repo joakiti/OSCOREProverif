@@ -1,0 +1,70 @@
+free c: channel.
+
+type host.
+type id.
+type key.
+
+const emptyId:id.
+
+const label_key: bitstring.
+const label_iv: bitstring.
+
+(*We imagine a server that can do 2 things, check if a lightbulb is on or off*)
+const isLightBulbTurnedOn : bitstring.
+const isLightBulbTurnedOff : bitstring.
+
+const non_confirmable: bitstring.
+const confirmable: bitstring.
+
+const coap_version_one:bitstring.
+const oscore_version_one:bitstring.
+const encrypt0:bitstring.
+
+(* Algorithms *)
+(* AEAD
+COSE supports two different encryption structures.  COSE_Encrypt0 is
+used when a recipient structure is not needed because the key to be
+used is known implicitly.
+*)
+
+const AES_CCM: bitstring.
+
+(* HKDF *)
+const HKDF_256: bitstring.
+
+free initiator, responder : host.
+
+fun HKDF(bitstring, bitstring, bitstring, bitstring): key.
+fun alg_key_length(bitstring, bitstring): key.
+fun token_length(bitstring):bitstring.
+fun aeadEncrypt(key, bitstring, bitstring): bitstring.
+reduc forall plaintext: bitstring, k: key, aad: bitstring; aeadDecrypt(aeadEncrypt(k, plaintext, aad), k, aad) = plaintext.
+reduc forall plaintext: bitstring, k: key, aad: bitstring; decrypt(aeadEncrypt(k, plaintext, aad), k) = plaintext.
+
+table security_context_lookup(host, host, id, id, bitstring, bitstring, bitstring).
+
+let oscore_initiator(identity : host) =
+  new token : bitstring;
+  new messageid : bitstring;
+  new partial_iv: bitstring; (*Starts at 0 and should increment*)
+  in(c, (endpoint: host));
+  get security_context_lookup(=identity, =endpoint, IDir:id, IDri:id, msecret:bitstring, msalt:bitstring, idcontext:bitstring) in (*Find a security context with endpoint*)
+  let CVInfo = (emptyId, idcontext, AES_CCM, label_iv) in let CommonIv = HKDF(msecret, msalt, CVInfo, alg_key_length(AES_CCM, label_iv)) in
+  let KirInfo = (IDir, idcontext, AES_CCM, label_key) in let Kir = HKDF(msecret, msalt, KirInfo, alg_key_length(AES_CCM, label_key)) in
+  let KriInfo = (IDri, idcontext, AES_CCM, label_key) in let Kri = HKDF(msecret, msalt, KriInfo, alg_key_length(AES_CCM, label_key)) in
+
+(* How to encrypt a COSE message *)
+(*
+1.  Create an Enc_structure and populate it with the appropriate
+     fields. E.g, there is an Encrypt0 identifier, + the AAD. The enc is then converted to AAD, and has very little restrictions on how this is done, so we dont have any either*)
+  let aad = (encrypt0, oscore_version_one, AES_CCM, IDir, partial_iv) in
+  (*
+  3. Determine the encryption key: Sender key
+  *)
+  (*
+    Call the encryption algorithm with key, plaintext, and aad.
+    Next todo: The structure of a COSE message has the ciphertext with the above.
+    In the unprotected we input what is states in the document.
+  *)
+  let msg_1 = aeadEncrypt(Kir, plaintext, aad) in
+  out(c, msg_1);

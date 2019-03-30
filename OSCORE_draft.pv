@@ -43,8 +43,6 @@ reduc forall master_secret: bitstring, master_salt:bitstring, i:id, ic:id_contex
 fun toKey(bitstring):key.
 fun toIV(bitstring):iv.
 
-
-
 (*Options*)
 free emptyIv: iv.
 free emptyId: id.
@@ -122,7 +120,7 @@ let oscore_initiator(identity : host) =
     An endpoint may free up memory by not storing the Common IV, Sender Key, and
     Recipient Key, deriving them when needed.
   *)
-  let CVInfo = info(emptyId, idcontext, default_aead_algorithm, label_iv) in let CommonIv = toIV(HKDF(msecret, msalt, CVInfo, alg_key_length(default_aead_algorithm, label_iv))) in
+  let CVInfo = (emptyId, idcontext, default_aead_algorithm, label_iv) in let CommonIv = toIV(HKDF(msecret, msalt, CVInfo, alg_key_length(default_aead_algorithm, label_iv))) in
   let KirInfo = info(IDir, idcontext, default_aead_algorithm, label_key) in let Kir = toKey(HKDF(msecret, msalt, KirInfo, alg_key_length(default_aead_algorithm, label_key))) in
   let KriInfo = info(IDri, idcontext, default_aead_algorithm, label_key) in let Kri = toKey(HKDF(msecret, msalt, KriInfo, alg_key_length(default_aead_algorithm, label_key))) in
   let version = CoAP_versionOne in let confirm = CoAP_nonConfirm in
@@ -213,8 +211,8 @@ let generate_new_security_context_initiator(IDir: id) =
 
 query Kir:key; attacker(new payload) ==> event (Reveal(Kir)).
 query CommonIv:iv; attacker(new payload) ==> event (IvReveal(CommonIv)).
-query x: host, CommonIv:iv, Kir:key; inj-event(endBparam(x)) ==> (inj-event(beginBparam(x)) || event(IvReveal(CommonIv)) || event(Reveal(Kir))).
-query x: host, CommonIv:iv, Kir:key; inj-event(endAparam(x)) ==> (inj-event(beginAparam(x)) || event(IvReveal(CommonIv)) || event(Reveal(Kir))).
+query x: host, CommonIv:iv, Kir:key; event(endBparam(x)) ==> (inj-event(beginBparam(x)) || event(IvReveal(CommonIv)) || event(Reveal(Kir))).
+query x: host, CommonIv:iv, Kir:key; event(endAparam(x)) ==> (inj-event(beginAparam(x)) || event(IvReveal(CommonIv)) || event(Reveal(Kir))).
 
 (*This query is acting weird, ask Alessandro:*)
 (*Got it working, but still.. is it sound?*)
