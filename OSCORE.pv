@@ -3,15 +3,25 @@ free c: channel.
 type host.
 type id.
 type key.
+type nonce.
 
 const emptyId:id.
+const empty:bitstring.
 
 const label_key: bitstring.
 const label_iv: bitstring.
 
-(*We imagine a server that can do 2 things, check if a lightbulb is on or off*)
+(*We imagine a server that can do 2 things, check if a lightbulb is on or off - these are to be considered payloads*)
 const isLightBulbTurnedOn : bitstring.
 const isLightBulbTurnedOff : bitstring.
+const lightbulbURIPath : bitstring.
+
+const CoAP_GETCode : bitstring.
+const CoAP_POSTCode : bitstring.
+const CoAP_CHANGEDCode : bitstring.
+const CoAP_CONTENTCode : bitstring.
+
+const OSCORE_option_code : bitstring.
 
 const non_confirmable: bitstring.
 const confirmable: bitstring.
@@ -22,9 +32,9 @@ const encrypt0:bitstring.
 
 (* Algorithms *)
 (* AEAD
-COSE supports two different encryption structures.  COSE_Encrypt0 is
-used when a recipient structure is not needed because the key to be
-used is known implicitly.
+  COSE supports two different encryption structures.  COSE_Encrypt0 is
+  used when a recipient structure is not needed because the key to be
+  used is known implicitly.
 *)
 
 const AES_CCM: bitstring.
@@ -35,29 +45,83 @@ const HKDF_256: bitstring.
 free initiator, responder : host.
 
 fun HKDF(bitstring, bitstring, bitstring, bitstring): key.
-fun alg_key_length(bitstring, bitstring): key.
-fun token_length(bitstring):bitstring.
-fun aeadEncrypt(key, bitstring, bitstring): bitstring.
-reduc forall plaintext: bitstring, k: key, aad: bitstring; aeadDecrypt(aeadEncrypt(k, plaintext, aad), k, aad) = plaintext.
-reduc forall plaintext: bitstring, k: key, aad: bitstring; decrypt(aeadEncrypt(k, plaintext, aad), k) = plaintext.
+fun alg_key_length(bitstring, bitstring): bitstring.
+fun bounded_by(bitstring):bitstring.
+fun aeadEncrypt(key, nonce, bitstring, bitstring): bitstring.
+event here.
+(*
+The CDDL fragment for COSE_Encrypt0 that corresponds to the above
+text is:
+
+COSE_Encrypt0 = [
+    Headers,
+    ciphertext : bstr / nil,
+]
+
+Since the  protected is empty, we dont include it.
+
+However, we have three fixed parameters:
+  PartialIV - Sender sequence number
+  kid - SenderID
+  Kid context - context identifier
+*)
+
+(*       PartialIV, SID, Context, Ciphertext*)
+
+
+(*The AEAD nonce is a result of a cryptographic function where it is assumed that
+  it is infeasible to reproduce without having the correct inputs.
+
+1.  left-pad the Partial IV (PIV) with zeroes to exactly 5 bytes,
+
+2.  left-pad the Sender ID of the endpoint that generated the Partial
+    IV (ID_PIV) with zeroes to exactly nonce length minus 6 bytes,
+
+3.  concatenate the size of the ID_PIV (a single byte S) with the
+    padded ID_PIV and the padded PIV,
+
+4.  and then XOR with the Common IV.
+
+E.g:
+<- nonce length minus 6 B -> <-- 5 bytes -->
+     +---+-------------------+--------+---------+-----+
+     | S |      padding      | ID_PIV | padding | PIV |----+
+     +---+-------------------+--------+---------+-----+    |
+                                                           |
+      <---------------- nonce length ---------------->     |
+     +------------------------------------------------+    |
+     |                   Common IV                    |->(XOR)
+     +------------------------------------------------+    |
+                                                           |
+      <---------------- nonce length ---------------->     |
+     +------------------------------------------------+    |
+     |                     Nonce                      |<---+
+     +------------------------------------------------+
+*)
+fun aeadNonce(id, bitstring, key) : nonce.
+
+reduc forall plaintext: bitstring, n: nonce, k: key, aad: bitstring; aeadDecrypt(aeadEncrypt(k, n, plaintext, aad), k, n, aad) = plaintext.
+reduc forall plaintext: bitstring, n: nonce, k: key, aad: bitstring; decrypt(aeadEncrypt(k, n, plaintext, aad), k, n) = plaintext.
 
 table security_context_lookup(host, host, id, id, bitstring, bitstring, bitstring).
+table token_to_message_lookup(host, bitstring, bitstring).
 
 let oscore_initiator(identity : host) =
-  new token : bitstring;
-  new messageid : bitstring;
+  (
+  new token : bitstring; (*How is token generated*)
+  new messageid : bitstring; (*How is message ID generated*)
   new partial_iv: bitstring; (*Starts at 0 and should increment*)
   in(c, (endpoint: host));
-  get security_context_lookup(=identity, =endpoint, IDir:id, IDri:id, msecret:bitstring, msalt:bitstring, idcontext:bitstring) in (*Find a security context with endpoint*)
-  let CVInfo = (emptyId, idcontext, AES_CCM, label_iv) in let CommonIv = HKDF(msecret, msalt, CVInfo, alg_key_length(AES_CCM, label_iv)) in
-  let KirInfo = (IDir, idcontext, AES_CCM, label_key) in let Kir = HKDF(msecret, msalt, KirInfo, alg_key_length(AES_CCM, label_key)) in
-  let KriInfo = (IDri, idcontext, AES_CCM, label_key) in let Kri = HKDF(msecret, msalt, KriInfo, alg_key_length(AES_CCM, label_key)) in
-
+  get security_context_lookup(=identity, =endpoint, senderID:id, recipientID:id, msecret:bitstring, msalt:bitstring, idcontext:bitstring) in (*Find a security context with endpoint*)
+  let cvInfo = (emptyId, idcontext, AES_CCM, label_iv) in let CommonIv = HKDF(msecret, msalt, cvInfo, alg_key_length(AES_CCM, label_iv)) in
+  let senderInfo = (senderID, idcontext, AES_CCM, label_key) in let senderKey = HKDF(msecret, msalt, senderInfo, alg_key_length(AES_CCM, label_key)) in
+  let recipientInfo = (recipientID, idcontext, AES_CCM, label_key) in let recipientKey = HKDF(msecret, msalt, recipientInfo, alg_key_length(AES_CCM, label_key)) in
 (* How to encrypt a COSE message *)
 (*
 1.  Create an Enc_structure and populate it with the appropriate
      fields. E.g, there is an Encrypt0 identifier, + the AAD. The enc is then converted to AAD, and has very little restrictions on how this is done, so we dont have any either*)
-  let aad = (encrypt0, oscore_version_one, AES_CCM, IDir, partial_iv) in
+  let aad = (encrypt0, oscore_version_one, AES_CCM, senderID, partial_iv) in
+  let aead_nonce = aeadNonce(senderID, partial_iv, CommonIv) in
   (*
   3. Determine the encryption key: Sender key
   *)
@@ -66,5 +130,114 @@ let oscore_initiator(identity : host) =
     Next todo: The structure of a COSE message has the ciphertext with the above.
     In the unprotected we input what is states in the document.
   *)
-  let msg_1 = aeadEncrypt(Kir, plaintext, aad) in
-  out(c, msg_1);
+  new msg_1id : bitstring;
+  (*Plaintext is encoded as a CoAP message without header, e.g
+  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |     Code      |    Class E options (if any) ...
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |1 1 1 1 1 1 1 1|    Payload (if any) ...
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       (only if there
+         is payload)
+
+     So, given it's basic structure we just call it a tuple, and give it a unique identifier.
+  *)
+  let plaintext = ((CoAP_GETCode, isLightBulbTurnedOn), msg_1id) in
+  let ciphertext = aeadEncrypt(senderKey, aead_nonce, plaintext, aad) in
+  (*
+  The COSE_Encrypt0 object used in OSCORE is transported in the OSCORE
+  option and in the Payload.  The Payload contains the Ciphertext of
+  the COSE object.  The headers of the COSE object are compactly
+  encoded as described in the next section. We don't take much care for the encoding.
+
+  Instead, we just say "The option contains these elemenets, and they can be read by all"
+  *)
+  let oscore_option = (partial_iv, senderID, idcontext) in
+  let msg_1 = (
+    (*Header*)
+    coap_version_one,
+    non_confirmable,
+    bounded_by(token), (*Token length is a value bounded by token*)
+    CoAP_POSTCode,
+    messageid,
+    (*Body*)
+    token,
+    oscore_option,
+    ciphertext) in
+
+  insert token_to_message_lookup(identity, token, (endpoint, senderID, recipientID, idcontext, partial_iv, aead_nonce));
+  out(c, msg_1)).
+
+let oscore_initiator_response_receiver(identity : host) =
+(*Extend to allow messages to send ACK if confirmable*)
+  in(c, (=coap_version_one, =non_confirmable,
+      tlength: bitstring, discard : bitstring,
+      messageid : bitstring, token: bitstring,
+      =empty, (*The OSCORE option*)
+      ciphertext:bitstring)); (*The encrypted payload*)
+
+  get token_to_message_lookup(=identity, =token, (endpoint:host, senderID:id, recipientID:id, idcontext:bitstring, partial_iv:bitstring, aead_nonce:nonce)) in
+  get security_context_lookup(=identity, =endpoint, =senderID, =recipientID, msecret:bitstring, msalt:bitstring, =idcontext) in (*Find a security context with endpoint*)
+  let aad = (encrypt0, oscore_version_one, AES_CCM, senderID, partial_iv) in
+  let recipientInfo = (recipientID, idcontext, AES_CCM, label_key) in let recipientKey = HKDF(msecret, msalt, recipientInfo, alg_key_length(AES_CCM, label_key)) in
+  let (plaintext:bitstring, identifier:bitstring) = aeadDecrypt(ciphertext, recipientKey, aead_nonce, aad) in
+  event here.
+
+let oscore_responder(identity : host) =
+  in(c, (=coap_version_one, =non_confirmable,
+        tlength: bitstring, discard : bitstring,
+        messageid : bitstring, token: bitstring,
+        (partial_iv:bitstring, recipientID:id, idcontext:bitstring), (*The OSCORE option*)
+        ciphertext:bitstring)); (*The encrypted payload*)
+  get security_context_lookup(=identity, endpoint:host, senderID:id, =recipientID, msecret:bitstring, msalt:bitstring, =idcontext) in (*Find a security context with endpoint*)
+  let cvInfo = (emptyId, idcontext, AES_CCM, label_iv) in let commonIV = HKDF(msecret, msalt, cvInfo, alg_key_length(AES_CCM, label_iv)) in
+  let recipientInfo = (recipientID, idcontext, AES_CCM, label_key) in let recipientKey = HKDF(msecret, msalt, recipientInfo, alg_key_length(AES_CCM, label_key)) in
+  (*Verify that partial iv has not been seen before.. tb implemented*)
+
+  (*Compose the aad..*)
+  let aad = (encrypt0, oscore_version_one, AES_CCM, recipientID, partial_iv) in
+  let aead_nonce = aeadNonce(recipientID, partial_iv, commonIV) in
+  let (plaintext:bitstring, identifier:bitstring) = aeadDecrypt(ciphertext, recipientKey, aead_nonce, aad) in
+  (*If decryption suceeds, update the replay window with partial iv*)
+
+  (*   8.  The decrypted CoAP request is processed according to [RFC7252].
+      We know that the message is a GET request, with a single response. So we generate a response from the plaintext!
+  *)
+  new msg_2id : bitstring;
+  new responseId : bitstring;
+  let responsePayload = bounded_by(plaintext) in (*Response payload is bounded by the plaintext*)
+  let sender_info = (senderID, idcontext, AES_CCM, label_key) in let senderKey = HKDF(msecret, msalt, sender_info, alg_key_length(AES_CCM, label_key)) in
+   (*Using the AEAD nonce from the request *)
+  let sender_ciphertext = aeadEncrypt(senderKey, aead_nonce, ((plaintext, CoAP_CONTENTCode), msg_2id), aad) in
+  let msg_2 = (
+    (*Header*)
+    coap_version_one,
+    non_confirmable,
+    bounded_by(token), (*Token length is a value bounded by token*)
+    CoAP_CHANGEDCode,
+    responseId,
+    (*Body*)
+    token,
+    empty,
+    sender_ciphertext) in
+  out(c, msg_2).
+
+
+query attacker(new msg_1id).
+query event(here).
+
+let init =
+  in(c, (a: host, b: host, senderID:id, recipientID:id, ms: bitstring, msalt:bitstring, idcontext: bitstring));
+  if a <> initiator && b <> responder then
+    if b <> initiator && a <> responder then
+      insert security_context_lookup(a, b, senderID, recipientID, ms, msalt, idcontext);
+      insert security_context_lookup(b, a, recipientID, senderID, ms, msalt, idcontext).
+
+process
+  new IDir:id; new IDri:id; new msecret : bitstring; new msalt:bitstring; new idcontext: bitstring;
+  (*Consider a shared table where all users are well behaved, and ONLY reads rows which belongs to them*)
+  insert security_context_lookup(initiator, responder, IDir, IDri, msecret, msalt, idcontext);
+  insert security_context_lookup(responder, initiator, IDri, IDir, msecret, msalt, idcontext);
+  (*These are the actors in our model*)
+  (!oscore_initiator(initiator)) | (!oscore_initiator_response_receiver(initiator)) | (!oscore_responder(responder)) | (!init)
