@@ -44,18 +44,37 @@ const HKDF_256: bitstring.
 
 free initiator, responder : host.
 
+(**)
 fun HKDF(bitstring, bitstring, bitstring, bitstring): key.
 fun alg_key_length(bitstring, bitstring): bitstring.
 fun bounded_by(bitstring):bitstring.
 fun aeadEncrypt(key, nonce, bitstring, bitstring): bitstring.
+
 event here.
 event startInitiator(host, host, bitstring).
-event endResponder(host,host,bitstring).
+event startInit(host, host, bitstring).
+event endResponder(host, host, bitstring).
+event sendResponder(host, host, bitstring).
+event responseReceived(host, host, bitstring).
+(*token + security_context *)
+event request_binding(bitstring, bitstring).
+event response_binding(bitstring, bitstring).
 (* Injective agreement Symmetric *)
 query attacker(new msg_1id).
 query event(here).
-query A:host, B:host, p:bitstring; event (endResponder(A,B,p)) ==> event(startInitiator(A,B,p)).
 
+(*Injective agreement*)
+query A:host, B:host, p:bitstring; inj-event (endResponder(A,B,p)) ==> event(startInitiator(A,B,p)).
+query A:host, B:host, p:bitstring; inj-event (sendResponder(A,B,bounded_by(p))) ==> event(startInit(A,B,p)).
+
+(*Request-response binding: An attacker should not be able to make a
+      client match a response to the wrong request. *)
+query token:bitstring, security_context:bitstring, fake_security_context:bitstring; event(response_binding(token, fake_security_context)) ==> event (request_binding(token, security_context)).
+(*Non-replayability: An attacker should not be able to cause the
+      receiver to accept a message which it has previously received and
+      accepted.*)
+
+query A:host, B:host, p:bitstring; inj-event (endResponder(A,B,p)) ==> event(startInitiator(A,B,p)).
 (*
 The CDDL fragment for COSE_Encrypt0 that corresponds to the above
 text is:
@@ -170,8 +189,11 @@ let oscore_initiator(identity : host) =
     token,
     oscore_option,
     ciphertext) in
-  event startInitiator(identity, endpoint, msg_1);
-  insert token_to_message_lookup(identity, token, (endpoint, senderID, recipientID, idcontext, partial_iv, aead_nonce));
+  let security_context = (endpoint, senderID, recipientID, idcontext, partial_iv, aead_nonce) in
+  insert token_to_message_lookup(identity, token, security_context);
+  event request_binding(token, security_context);
+  event startInitiator(identity, endpoint, plaintext);
+  event startInit(identity, endpoint, (CoAP_GETCode, isLightBulbTurnedOn));
   out(c, msg_1)).
 
 let oscore_initiator_response_receiver(identity : host) =
@@ -181,12 +203,14 @@ let oscore_initiator_response_receiver(identity : host) =
       messageid : bitstring, token: bitstring,
       =empty, (*The OSCORE option*)
       ciphertext:bitstring)); (*The encrypted payload*)
-  get token_to_message_lookup(=identity, =token, (endpoint:host, senderID:id, recipientID:id, idcontext:bitstring, partial_iv:bitstring, aead_nonce:nonce)) in
+  get token_to_message_lookup(=identity, =token, security_context:bitstring) in
+  event response_binding(token, security_context);
+  let (endpoint:host, senderID:id, recipientID:id, idcontext:bitstring, partial_iv:bitstring, aead_nonce:nonce) = security_context in
   get security_context_lookup(=identity, =endpoint, =senderID, =recipientID, msecret:bitstring, msalt:bitstring, =idcontext) in (*Find a security context with endpoint*)
   let aad = (encrypt0, oscore_version_one, AES_CCM, senderID, partial_iv) in
   let recipientInfo = (recipientID, idcontext, AES_CCM, label_key) in let recipientKey = HKDF(msecret, msalt, recipientInfo, alg_key_length(AES_CCM, label_key)) in
   let (plaintext:bitstring, identifier:bitstring) = aeadDecrypt(ciphertext, recipientKey, aead_nonce, aad) in
-  event here.
+  event responseReceived(identity, endpoint, plaintext).
 
 let oscore_responder(identity : host) =
   in(c, (=coap_version_one, =non_confirmable,
@@ -225,6 +249,8 @@ let oscore_responder(identity : host) =
     token,
     empty,
     sender_ciphertext) in
+  event endResponder(endpoint, identity, (plaintext, identifier));
+  event sendResponder(endpoint, identity, responsePayload);
   out(c, msg_2).
 
 let init =
