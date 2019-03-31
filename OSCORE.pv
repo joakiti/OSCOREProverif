@@ -49,6 +49,13 @@ fun alg_key_length(bitstring, bitstring): bitstring.
 fun bounded_by(bitstring):bitstring.
 fun aeadEncrypt(key, nonce, bitstring, bitstring): bitstring.
 event here.
+event startInitiator(host, host, bitstring).
+event endResponder(host,host,bitstring).
+(* Injective agreement Symmetric *)
+query attacker(new msg_1id).
+query event(here).
+query A:host, B:host, p:bitstring; event (endResponder(A,B,p)) ==> event(startInitiator(A,B,p)).
+
 (*
 The CDDL fragment for COSE_Encrypt0 that corresponds to the above
 text is:
@@ -127,8 +134,6 @@ let oscore_initiator(identity : host) =
   *)
   (*
     Call the encryption algorithm with key, plaintext, and aad.
-    Next todo: The structure of a COSE message has the ciphertext with the above.
-    In the unprotected we input what is states in the document.
   *)
   new msg_1id : bitstring;
   (*Plaintext is encoded as a CoAP message without header, e.g
@@ -141,7 +146,7 @@ let oscore_initiator(identity : host) =
        (only if there
          is payload)
 
-     So, given it's basic structure we just call it a tuple, and give it a unique identifier.
+     So, given it's basic structure we just call it a tuple, and give it a unique identifier for attacking.
   *)
   let plaintext = ((CoAP_GETCode, isLightBulbTurnedOn), msg_1id) in
   let ciphertext = aeadEncrypt(senderKey, aead_nonce, plaintext, aad) in
@@ -165,7 +170,7 @@ let oscore_initiator(identity : host) =
     token,
     oscore_option,
     ciphertext) in
-
+  event startInitiator(identity, endpoint, msg_1);
   insert token_to_message_lookup(identity, token, (endpoint, senderID, recipientID, idcontext, partial_iv, aead_nonce));
   out(c, msg_1)).
 
@@ -176,7 +181,6 @@ let oscore_initiator_response_receiver(identity : host) =
       messageid : bitstring, token: bitstring,
       =empty, (*The OSCORE option*)
       ciphertext:bitstring)); (*The encrypted payload*)
-
   get token_to_message_lookup(=identity, =token, (endpoint:host, senderID:id, recipientID:id, idcontext:bitstring, partial_iv:bitstring, aead_nonce:nonce)) in
   get security_context_lookup(=identity, =endpoint, =senderID, =recipientID, msecret:bitstring, msalt:bitstring, =idcontext) in (*Find a security context with endpoint*)
   let aad = (encrypt0, oscore_version_one, AES_CCM, senderID, partial_iv) in
@@ -222,10 +226,6 @@ let oscore_responder(identity : host) =
     empty,
     sender_ciphertext) in
   out(c, msg_2).
-
-
-query attacker(new msg_1id).
-query event(here).
 
 let init =
   in(c, (a: host, b: host, senderID:id, recipientID:id, ms: bitstring, msalt:bitstring, idcontext: bitstring));
