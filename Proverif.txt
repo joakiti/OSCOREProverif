@@ -1,0 +1,123 @@
+Process:
+{1}new IDir: id;
+{2}new IDri: id;
+{3}new msecret: bitstring;
+{4}new msalt: bitstring;
+{5}new idcontext: bitstring;
+{6}insert security_context_lookup(initiator,responder,IDir,IDri,msecret,msalt,idcontext);
+{7}insert security_context_lookup(responder,initiator,IDri,IDir,msecret,msalt,idcontext);
+(
+    {8}!
+    {9}new token: bitstring;
+    {10}new messageid: bitstring;
+    {11}new partial_iv: bitstring;
+    {12}in(c, endpoint: host);
+    {28}get security_context_lookup(=initiator,=endpoint,senderID: id,recipientID: id,msecret_29: bitstring,msalt_30: bitstring,idcontext_31: bitstring) in
+    {13}let cvInfo: bitstring = (emptyId,idcontext_31,AES_CCM,label_iv) in
+    {14}let CommonIv: key = HKDF(msecret_29,msalt_30,cvInfo,alg_key_length(AES_CCM,label_iv)) in
+    {15}let senderInfo: bitstring = (senderID,idcontext_31,AES_CCM,label_key) in
+    {16}let SenderKey: key = HKDF(msecret_29,msalt_30,senderInfo,alg_key_length(AES_CCM,label_key)) in
+    {17}let recipientInfo: bitstring = (recipientID,idcontext_31,AES_CCM,label_key) in
+    {18}let RecipientKey: key = HKDF(msecret_29,msalt_30,recipientInfo,alg_key_length(AES_CCM,label_key)) in
+    {19}let aad_32: bitstring = (encrypt0,oscore_version_one,AES_CCM,senderID,partial_iv) in
+    {20}let aead_nonce: nonce = aeadNonce(senderID,partial_iv,CommonIv) in
+    {21}new msg_1id: bitstring;
+    {22}let plaintext_33: bitstring = (CoAP_GETCode,isLightBulbTurnedOn,msg_1id) in
+    {23}let ciphertext: bitstring = aeadEncrypt(SenderKey,aead_nonce,plaintext_33,aad_32) in
+    {24}let oscore_option: bitstring = (partial_iv,senderID) in
+    {25}let msg_1_34: bitstring = (coap_version_one,non_confirmable,token_length(token),CoAP_POSTCode,messageid,token,oscore_option,ciphertext) in
+    {26}out(c, msg_1_34);
+    {27}out(c, SenderKey)
+) | (
+    {29}!
+    {30}in(c, (a: host,b: host,senderID_35: id,recipientID_36: id,ms: bitstring,msalt_37: bitstring,idcontext_38: bitstring));
+    {31}if ((a <> initiator) && (b <> responder)) then
+    {32}if ((b <> initiator) && (a <> responder)) then
+    {33}insert security_context_lookup(a,b,senderID_35,recipientID_36,ms,msalt_37,idcontext_38);
+    {34}insert security_context_lookup(b,a,recipientID_36,senderID_35,ms,msalt_37,idcontext_38)
+)
+
+-- Query not attacker(msg_1id[idcontext_31 = v_1474,msalt_30 = v_1475,msecret_29 = v_1476,recipientID = v_1477,senderID = v_1478,endpoint = v_1479,!1 = v_1480])
+Completing...
+Starting query not attacker(msg_1id[idcontext_31 = v_1474,msalt_30 = v_1475,msecret_29 = v_1476,recipientID = v_1477,senderID = v_1478,endpoint = v_1479,!1 = v_1480])
+goal reachable: attacker(msg_1id[idcontext_31 = idcontext[],msalt_30 = msalt[],msecret_29 = msecret[],recipientID = IDri[],senderID = IDir[],endpoint = responder[],!1 = @sid_1898])
+Abbreviations:
+msg = msg_1id[idcontext_31 = idcontext[],msalt_30 = msalt[],msecret_29 = msecret[],recipientID = IDri[],senderID = IDir[],endpoint = responder[],!1 = @sid_1919]
+partial = partial_iv[!1 = @sid_1919]
+token_1942 = token[!1 = @sid_1919]
+messageid_1943 = messageid[!1 = @sid_1919]
+
+1. The attacker initially knows responder[].
+attacker(responder[]).
+
+2. The entry security_context_lookup(initiator[],responder[],IDir[],IDri[],msecret[],msalt[],idcontext[]) may be inserted in a table at insert {6}.
+table(security_context_lookup(initiator[],responder[],IDir[],IDri[],msecret[],msalt[],idcontext[])).
+
+3. The message responder[] that the attacker may have by 1 may be received at input {12}.
+The entry security_context_lookup(initiator[],responder[],IDir[],IDri[],msecret[],msalt[],idcontext[]) that may be in a table by 2 may be read at get {28}.
+So the message HKDF(msecret[],msalt[],(IDir[],idcontext[],AES_CCM,label_key),alg_key_length(AES_CCM,label_key)) may be sent to the attacker at output {27}.
+attacker(HKDF(msecret[],msalt[],(IDir[],idcontext[],AES_CCM,label_key),alg_key_length(AES_CCM,label_key))).
+
+4. The message responder[] that the attacker may have by 1 may be received at input {12}.
+The entry security_context_lookup(initiator[],responder[],IDir[],IDri[],msecret[],msalt[],idcontext[]) that may be in a table by 2 may be read at get {28}.
+So the message (coap_version_one,non_confirmable,token_length(token_1942),CoAP_POSTCode,messageid_1943,token_1942,(partial,IDir[]),aeadEncrypt(HKDF(msecret[],msalt[],(IDir[],idcontext[],AES_CCM,label_key),alg_key_length(AES_CCM,label_key)),aeadNonce(IDir[],partial,HKDF(msecret[],msalt[],(emptyId,idcontext[],AES_CCM,label_iv),alg_key_length(AES_CCM,label_iv))),(CoAP_GETCode,isLightBulbTurnedOn,msg),(encrypt0,oscore_version_one,AES_CCM,IDir[],partial))) may be sent to the attacker at output {26}.
+attacker((coap_version_one,non_confirmable,token_length(token_1942),CoAP_POSTCode,messageid_1943,token_1942,(partial,IDir[]),aeadEncrypt(HKDF(msecret[],msalt[],(IDir[],idcontext[],AES_CCM,label_key),alg_key_length(AES_CCM,label_key)),aeadNonce(IDir[],partial,HKDF(msecret[],msalt[],(emptyId,idcontext[],AES_CCM,label_iv),alg_key_length(AES_CCM,label_iv))),(CoAP_GETCode,isLightBulbTurnedOn,msg),(encrypt0,oscore_version_one,AES_CCM,IDir[],partial)))).
+
+5. By 4, the attacker may know (coap_version_one,non_confirmable,token_length(token_1942),CoAP_POSTCode,messageid_1943,token_1942,(partial,IDir[]),aeadEncrypt(HKDF(msecret[],msalt[],(IDir[],idcontext[],AES_CCM,label_key),alg_key_length(AES_CCM,label_key)),aeadNonce(IDir[],partial,HKDF(msecret[],msalt[],(emptyId,idcontext[],AES_CCM,label_iv),alg_key_length(AES_CCM,label_iv))),(CoAP_GETCode,isLightBulbTurnedOn,msg),(encrypt0,oscore_version_one,AES_CCM,IDir[],partial))).
+Using the function 8-proj-8-tuple the attacker may obtain aeadEncrypt(HKDF(msecret[],msalt[],(IDir[],idcontext[],AES_CCM,label_key),alg_key_length(AES_CCM,label_key)),aeadNonce(IDir[],partial,HKDF(msecret[],msalt[],(emptyId,idcontext[],AES_CCM,label_iv),alg_key_length(AES_CCM,label_iv))),(CoAP_GETCode,isLightBulbTurnedOn,msg),(encrypt0,oscore_version_one,AES_CCM,IDir[],partial)).
+attacker(aeadEncrypt(HKDF(msecret[],msalt[],(IDir[],idcontext[],AES_CCM,label_key),alg_key_length(AES_CCM,label_key)),aeadNonce(IDir[],partial,HKDF(msecret[],msalt[],(emptyId,idcontext[],AES_CCM,label_iv),alg_key_length(AES_CCM,label_iv))),(CoAP_GETCode,isLightBulbTurnedOn,msg),(encrypt0,oscore_version_one,AES_CCM,IDir[],partial))).
+
+6. By 5, the attacker may know aeadEncrypt(HKDF(msecret[],msalt[],(IDir[],idcontext[],AES_CCM,label_key),alg_key_length(AES_CCM,label_key)),aeadNonce(IDir[],partial,HKDF(msecret[],msalt[],(emptyId,idcontext[],AES_CCM,label_iv),alg_key_length(AES_CCM,label_iv))),(CoAP_GETCode,isLightBulbTurnedOn,msg),(encrypt0,oscore_version_one,AES_CCM,IDir[],partial)).
+By 3, the attacker may know HKDF(msecret[],msalt[],(IDir[],idcontext[],AES_CCM,label_key),alg_key_length(AES_CCM,label_key)).
+Using the function decrypt the attacker may obtain (CoAP_GETCode,isLightBulbTurnedOn,msg).
+attacker((CoAP_GETCode,isLightBulbTurnedOn,msg)).
+
+7. By 6, the attacker may know (CoAP_GETCode,isLightBulbTurnedOn,msg).
+Using the function 3-proj-3-tuple the attacker may obtain msg.
+attacker(msg).
+
+
+A more detailed output of the traces is available with
+  set traceDisplay = long.
+
+new IDir: id creating IDir_1950 at {1}
+
+new IDri: id creating IDri_1949 at {2}
+
+new msecret: bitstring creating msecret_1948 at {3}
+
+new msalt: bitstring creating msalt_1947 at {4}
+
+new idcontext: bitstring creating idcontext_1946 at {5}
+
+insert security_context_lookup(initiator,responder,IDir_1950,IDri_1949,msecret_1948,msalt_1947,idcontext_1946) at {6}
+
+insert security_context_lookup(responder,initiator,IDri_1949,IDir_1950,msecret_1948,msalt_1947,idcontext_1946) at {7}
+
+new token: bitstring creating token_2007 at {9} in copy a_1945
+
+new messageid: bitstring creating messageid_2008 at {10} in copy a_1945
+
+new partial_iv: bitstring creating partial_iv_2009 at {11} in copy a_1945
+
+new token: bitstring creating token_1952 at {9} in copy a_1944
+
+new messageid: bitstring creating messageid_1953 at {10} in copy a_1944
+
+new partial_iv: bitstring creating partial_iv_1954 at {11} in copy a_1944
+
+in(c, responder) at {12} in copy a_1944
+
+get security_context_lookup(initiator,responder,IDir_1950,IDri_1949,msecret_1948,msalt_1947,idcontext_1946) at {28} in copy a_1944
+
+new msg_1id: bitstring creating msg_1id_1951 at {21} in copy a_1944
+
+out(c, (~M_2117,~M_2118,~M_2119,~M_2120,~M_2121,~M_2122,(~M_2125,~M_2126),~M_2124)) with ~M_2117 = coap_version_one, ~M_2118 = non_confirmable, ~M_2119 = token_length(token_1952), ~M_2120 = CoAP_POSTCode, ~M_2121 = messageid_1953, ~M_2122 = token_1952, ~M_2125 = partial_iv_1954, ~M_2126 = IDir_1950, ~M_2124 = aeadEncrypt(HKDF(msecret_1948,msalt_1947,(IDir_1950,idcontext_1946,AES_CCM,label_key),alg_key_length(AES_CCM,label_key)),aeadNonce(IDir_1950,partial_iv_1954,HKDF(msecret_1948,msalt_1947,(emptyId,idcontext_1946,AES_CCM,label_iv),alg_key_length(AES_CCM,label_iv))),(CoAP_GETCode,isLightBulbTurnedOn,msg_1id_1951),(encrypt0,oscore_version_one,AES_CCM,IDir_1950,partial_iv_1954)) at {26} in copy a_1944
+
+out(c, ~M_2128) with ~M_2128 = HKDF(msecret_1948,msalt_1947,(IDir_1950,idcontext_1946,AES_CCM,label_key),alg_key_length(AES_CCM,label_key)) at {27} in copy a_1944
+
+The attacker has the message 3-proj-3-tuple(decrypt(~M_2124,~M_2128)) = msg_1id_1951.
+A trace has been found.
+The previous trace falsifies the query, because the query is
+simple and the trace corresponds to the derivation.
+RESULT not attacker(msg_1id[idcontext_31 = v_1474,msalt_30 = v_1475,msecret_29 = v_1476,recipientID = v_1477,senderID = v_1478,endpoint = v_1479,!1 = v_1480]) is false.
