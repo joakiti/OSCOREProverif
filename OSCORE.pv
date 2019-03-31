@@ -70,10 +70,11 @@ query A:host, B:host, p:bitstring; inj-event (sendResponder(A,B,bounded_by(p))) 
 (*Request-response binding: An attacker should not be able to make a
       client match a response to the wrong request. *)
 query token:bitstring, security_context:bitstring, fake_security_context:bitstring; event(response_binding(token, fake_security_context)) ==> event (request_binding(token, security_context)).
-(*Non-replayability: An attacker should not be able to cause the
-      receiver to accept a message which it has previously received and
-      accepted.*)
-
+(*
+Non-replayability: An attacker should not be able to cause the
+receiver to accept a message which it has previously received and
+accepted.
+      *)
 query A:host, B:host, p:bitstring; inj-event (endResponder(A,B,p)) ==> event(startInitiator(A,B,p)).
 (*
 The CDDL fragment for COSE_Encrypt0 that corresponds to the above
@@ -266,4 +267,4 @@ process
   insert security_context_lookup(initiator, responder, IDir, IDri, msecret, msalt, idcontext);
   insert security_context_lookup(responder, initiator, IDri, IDir, msecret, msalt, idcontext);
   (*These are the actors in our model*)
-  (!oscore_initiator(initiator)) | (!oscore_initiator_response_receiver(initiator)) | (!oscore_responder(responder)) | (!init)
+  (!oscore_initiator(initiator)) | (!oscore_initiator_response_receiver(initiator)) | (!oscore_responder(responder)) | (!init) | phase 1; out(c, (msecret, msalt))
