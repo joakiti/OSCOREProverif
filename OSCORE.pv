@@ -50,6 +50,7 @@ free initiator, responder : host.
 fun HKDF(bitstring, bitstring, bitstring, bitstring): key.
 fun alg_key_length(bitstring, bitstring): bitstring.
 fun bounded_by(bitstring):bitstring.
+fun bounded_by_hosts(host, host):bitstring.
 fun aeadEncrypt(key, nonce, bitstring, bitstring): bitstring.
 
 event here.
@@ -62,13 +63,14 @@ event responseReceived(host, host, bitstring).
 event request_binding(bitstring, bitstring).
 event response_binding(bitstring, bitstring).
 (* Injective agreement Symmetric *)
-query attacker(new msg_1id) phase 1. (* Forward secrecy does NOT work *)
-query attacker(new msg_1id) phase 0. (* Secrecy does work *)
+(*)
+query attacker(bounded_by_hosts(initiator, responder)) phase 1. (* Forward secrecy does NOT work *)
+(*query attacker(bounded_by_hosts(initiator, responder)) phase 0. (* Secrecy does work *)
 query event(here).
 
 (*Injective agreement*)
-query A:host, B:host, p:bitstring; inj-event (endResponder(A,B,p)) ==> inj-event(startInitiator(A,B,p)).
-query A:host, B:host, p:bitstring; inj-event (sendResponder(A,B,bounded_by(p))) ==> inj-event(startInit(A,B,p)).
+query A:host, B:host, p:bitstring; event (endResponder(A,B,p)) ==> event(startInitiator(A,B,p)).
+query A:host, B:host, p:bitstring; event (sendResponder(A,B,bounded_by(p))) ==> event(startInit(A,B,p)).
 
 (*Request-response binding: An attacker should not be able to make a
       client match a response to the wrong request. *)
@@ -78,7 +80,7 @@ Non-replayability: An attacker should not be able to cause the
 receiver to accept a message which it has previously received and
 accepted.
       *)
-query A:host, B:host, p:bitstring; inj-event (endResponder(A,B,p)) ==> event(startInitiator(A,B,p)).
+
 (*
 The CDDL fragment for COSE_Encrypt0 that corresponds to the above
 text is:
@@ -137,8 +139,8 @@ table security_context_lookup(host, host, id, id, bitstring, bitstring, bitstrin
 table token_to_message_lookup(host, bitstring, bitstring).
 table replay_window(bitstring).
 
-let oscore_initiator(identity : host) =
-  (
+let oscore_initiator =
+  in(c, (identity: host));
   new token : bitstring; (*Randomly generated token!*)
   new messageid : bitstring; (*Randomly genereated ID!*)
   new partial_iv: bitstring; (*Starts at 0 and should increment*)
@@ -167,7 +169,7 @@ let oscore_initiator(identity : host) =
   (*
     Call the encryption algorithm with key, plaintext, and aad.
   *)
-  new msg_1id : bitstring;
+  new msg1id:bitstring;
   (*Plaintext is encoded as a CoAP message without header, e.g
   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -180,7 +182,7 @@ let oscore_initiator(identity : host) =
 
      So, given it's basic structure we just call it a tuple, and give it a unique identifier for attacking.
   *)
-  let plaintext = ((CoAP_GETCode, isLightBulbTurnedOn), msg_1id) in
+  let plaintext = ((CoAP_GETCode, isLightBulbTurnedOn), (msg1id)) in
   let ciphertext = aeadEncrypt(senderKey, aead_nonce, plaintext, aad) in
   (*
   The COSE_Encrypt0 object used in OSCORE is transported in the OSCORE
@@ -207,10 +209,11 @@ let oscore_initiator(identity : host) =
   event request_binding(token, security_context);
   event startInitiator(identity, endpoint, plaintext);
   event startInit(identity, endpoint, (CoAP_GETCode, isLightBulbTurnedOn));
-  out(c, msg_1)).
+  out(c, msg_1).
 
-let oscore_initiator_response_receiver(identity : host) =
+let oscore_initiator_response_receiver =
 (*Extend to allow messages to send ACK if confirmable*)
+  in(c, (identity: host));
   in(c, (=coap_version_one, =non_confirmable,
       tlength: bitstring, discard : bitstring,
       messageid : bitstring, token: bitstring,
@@ -226,7 +229,8 @@ let oscore_initiator_response_receiver(identity : host) =
   event here;
   event responseReceived(identity, endpoint, plaintext).
 
-let oscore_responder(identity : host) =
+let oscore_responder =
+  in(c, identity: host);
   in(c, (=coap_version_one, T:bitstring,
         tlength: bitstring, discard : bitstring,
         messageid : bitstring, token: bitstring,
@@ -292,4 +296,8 @@ process
   insert security_context_lookup(initiator, responder, IDir, IDri, msecret, msalt, idcontext);
   insert security_context_lookup(responder, initiator, IDri, IDir, msecret, msalt, idcontext);
   (*These are the actors in our model*)
-  (!oscore_initiator(initiator)) | (!oscore_initiator_response_receiver(initiator)) | (!oscore_responder(responder)) | (!init) | phase 1; out(c, (msecret, msalt))
+  (!oscore_initiator) |
+  (!oscore_initiator_response_receiver) |
+  (!oscore_responder) |
+  (!init) |
+  (phase 1; out(c, (msecret, msalt)))
