@@ -20,9 +20,11 @@ const CoAP_GETCode : bitstring.
 const CoAP_POSTCode : bitstring.
 const CoAP_CHANGEDCode : bitstring.
 const CoAP_CONTENTCode : bitstring.
+const CoAP_EMPTYCode : bitstring.
 
 const OSCORE_option_code : bitstring.
 
+const acknowledgement: bitstring.
 const non_confirmable: bitstring.
 const confirmable: bitstring.
 
@@ -221,14 +223,23 @@ let oscore_initiator_response_receiver(identity : host) =
   let aad = (encrypt0, oscore_version_one, AES_CCM, senderID, partial_iv) in
   let recipientInfo = (recipientID, idcontext, AES_CCM, label_key) in let recipientKey = HKDF(msecret, msalt, recipientInfo, alg_key_length(AES_CCM, label_key)) in
   let (plaintext:bitstring, identifier:bitstring) = aeadDecrypt(ciphertext, recipientKey, aead_nonce, aad) in
+  event here;
   event responseReceived(identity, endpoint, plaintext).
 
 let oscore_responder(identity : host) =
-  in(c, (=coap_version_one, =non_confirmable,
+  in(c, (=coap_version_one, T:bitstring,
         tlength: bitstring, discard : bitstring,
         messageid : bitstring, token: bitstring,
         (partial_iv:bitstring, recipientID:id, idcontext:bitstring), (*The OSCORE option*)
         ciphertext:bitstring)); (*The encrypted payload*)
+        (*   One way to implement this in a server is to initiate the attempt to
+   obtain the resource representation and, while that is in progress,
+   time out an acknowledgement timer.  A server may also immediately
+   send an acknowledgement if it knows in advance that there will be no
+   piggybacked response.  In both cases, the acknowledgement effectively
+   is a promise that the request will be acted upon later.*)
+  if T = confirmable then
+    out(c, (coap_version_one, acknowledgement, CoAP_EMPTYCode, messageid));
   get security_context_lookup(=identity, endpoint:host, senderID:id, =recipientID, msecret:bitstring, msalt:bitstring, =idcontext) in (*Find a security context with endpoint*)
   let cvInfo = (emptyId, idcontext, AES_CCM, label_iv) in let commonIV = HKDF(msecret, msalt, cvInfo, alg_key_length(AES_CCM, label_iv)) in
   let recipientInfo = (recipientID, idcontext, AES_CCM, label_key) in let recipientKey = HKDF(msecret, msalt, recipientInfo, alg_key_length(AES_CCM, label_key)) in
@@ -238,10 +249,10 @@ let oscore_responder(identity : host) =
   let aad = (encrypt0, oscore_version_one, AES_CCM, recipientID, partial_iv) in
   let aead_nonce = aeadNonce(recipientID, partial_iv, commonIV) in
 
-  insert replay_window(partial_iv);
-
-  let (plaintext:bitstring, identifier:bitstring) = aeadDecrypt(ciphertext, recipientKey, aead_nonce, aad) in
+  (*This does not work properly :( )*)
   get replay_window(partial:bitstring) suchthat partial = partial_iv else
+  insert replay_window(partial_iv);
+  let (plaintext:bitstring, identifier:bitstring) = aeadDecrypt(ciphertext, recipientKey, aead_nonce, aad) in
   (*If decryption suceeds, update the replay window with partial iv*)
 
   (*   8.  The decrypted CoAP request is processed according to [RFC7252].
