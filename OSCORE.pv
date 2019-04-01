@@ -60,12 +60,13 @@ event responseReceived(host, host, bitstring).
 event request_binding(bitstring, bitstring).
 event response_binding(bitstring, bitstring).
 (* Injective agreement Symmetric *)
-query attacker(new msg_1id).
+query attacker(new msg_1id) phase 1. (* Forward secrecy does NOT work *)
+query attacker(new msg_1id) phase 0. (* Secrecy does work *)
 query event(here).
 
 (*Injective agreement*)
-query A:host, B:host, p:bitstring; inj-event (endResponder(A,B,p)) ==> event(startInitiator(A,B,p)).
-query A:host, B:host, p:bitstring; inj-event (sendResponder(A,B,bounded_by(p))) ==> event(startInit(A,B,p)).
+query A:host, B:host, p:bitstring; inj-event (endResponder(A,B,p)) ==> inj-event(startInitiator(A,B,p)).
+query A:host, B:host, p:bitstring; inj-event (sendResponder(A,B,bounded_by(p))) ==> inj-event(startInit(A,B,p)).
 
 (*Request-response binding: An attacker should not be able to make a
       client match a response to the wrong request. *)
@@ -132,12 +133,21 @@ reduc forall plaintext: bitstring, n: nonce, k: key, aad: bitstring; decrypt(aea
 
 table security_context_lookup(host, host, id, id, bitstring, bitstring, bitstring).
 table token_to_message_lookup(host, bitstring, bitstring).
+table replay_window(bitstring).
 
 let oscore_initiator(identity : host) =
   (
-  new token : bitstring; (*How is token generated*)
-  new messageid : bitstring; (*How is message ID generated*)
+  new token : bitstring; (*Randomly generated token!*)
+  new messageid : bitstring; (*Randomly genereated ID!*)
   new partial_iv: bitstring; (*Starts at 0 and should increment*)
+  (*
+  Note: When a Confirmable message is retransmitted, a new DTLS
+   sequence_number is used for each attempt, even though the CoAP
+   Message ID stays the same.  So a recipient still has to perform
+   deduplication as described in Section 4.5.  Retransmissions MUST NOT
+   be performed across epochs.
+
+   E.g ALWAYS increase*)
   in(c, (endpoint: host));
   get security_context_lookup(=identity, =endpoint, senderID:id, recipientID:id, msecret:bitstring, msalt:bitstring, idcontext:bitstring) in (*Find a security context with endpoint*)
   let cvInfo = (emptyId, idcontext, AES_CCM, label_iv) in let CommonIv = HKDF(msecret, msalt, cvInfo, alg_key_length(AES_CCM, label_iv)) in
@@ -227,7 +237,11 @@ let oscore_responder(identity : host) =
   (*Compose the aad..*)
   let aad = (encrypt0, oscore_version_one, AES_CCM, recipientID, partial_iv) in
   let aead_nonce = aeadNonce(recipientID, partial_iv, commonIV) in
+
+  insert replay_window(partial_iv);
+
   let (plaintext:bitstring, identifier:bitstring) = aeadDecrypt(ciphertext, recipientKey, aead_nonce, aad) in
+  get replay_window(partial:bitstring) suchthat partial = partial_iv else
   (*If decryption suceeds, update the replay window with partial iv*)
 
   (*   8.  The decrypted CoAP request is processed according to [RFC7252].
