@@ -137,12 +137,15 @@ reduc forall plaintext: bitstring, n: nonce, k: key, aad: bitstring; decrypt(aea
 
 table security_context_lookup(host, host, id, id, bitstring, bitstring, bitstring).
 table token_to_message_lookup(host, bitstring, bitstring).
-table replay_window(bitstring).
+table replay_window(host, bitstring).
 
 let oscore_initiator =
   in(c, (identity: host));
-  new token : bitstring; (*Randomly generated token!*)
-  new messageid : bitstring; (*Randomly genereated ID!*)
+  new token : bitstring; (*Randomly generated token! The Token value is used to
+   correlate requests and responses.*)
+  new messageid : bitstring; (*Randomly genereated ID!
+    Each message contains a Message ID used
+   to detect duplicates and for optional reliability. *)
   new partial_iv: bitstring; (*Starts at 0 and should increment*)
   (*
   Note: When a Confirmable message is retransmitted, a new DTLS
@@ -243,6 +246,10 @@ let oscore_responder =
    piggybacked response.  In both cases, the acknowledgement effectively
    is a promise that the request will be acted upon later.*)
   if T = confirmable then
+    (*f immediately available, the response to a request
+   carried in a Confirmable message is carried in the resulting
+   Acknowledgement (ACK) message.  This is called a piggybacked
+   response. We dont.*)
     out(c, (coap_version_one, acknowledgement, CoAP_EMPTYCode, messageid));
   get security_context_lookup(=identity, endpoint:host, senderID:id, =recipientID, msecret:bitstring, msalt:bitstring, =idcontext) in (*Find a security context with endpoint*)
   let cvInfo = (emptyId, idcontext, AES_CCM, label_iv) in let commonIV = HKDF(msecret, msalt, cvInfo, alg_key_length(AES_CCM, label_iv)) in
@@ -254,16 +261,20 @@ let oscore_responder =
   let aead_nonce = aeadNonce(recipientID, partial_iv, commonIV) in
 
   (*This does not work properly :( )*)
-  get replay_window(partial:bitstring) suchthat partial = partial_iv else
-  insert replay_window(partial_iv);
   let (plaintext:bitstring, identifier:bitstring) = aeadDecrypt(ciphertext, recipientKey, aead_nonce, aad) in
+  get replay_window(=identity, partial:bitstring) suchthat partial = partial_iv in out(c, partial) else
+  insert replay_window(identity, partial_iv);
   (*If decryption suceeds, update the replay window with partial iv*)
 
   (*   8.  The decrypted CoAP request is processed according to [RFC7252].
       We know that the message is a GET request, with a single response. So we generate a response from the plaintext!
   *)
   new msg_2id : bitstring;
+
   new responseId : bitstring;
+  (*To enable the receiver
+   to act only once on the message, Non-confirmable messages specify a
+   Message ID as well.*)
   let responsePayload = bounded_by(plaintext) in (*Response payload is bounded by the plaintext*)
   let sender_info = (senderID, idcontext, AES_CCM, label_key) in let senderKey = HKDF(msecret, msalt, sender_info, alg_key_length(AES_CCM, label_key)) in
    (*Using the AEAD nonce from the request *)
