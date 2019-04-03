@@ -63,17 +63,20 @@ event responseReceived(host, host, bitstring).
 event request_binding(bitstring, bitstring).
 event response_binding(bitstring, bitstring).
 (* Injective agreement Symmetric *)
-(*)
-query attacker(bounded_by_hosts(initiator, responder)) phase 1. (* Forward secrecy does NOT work *)
-(*query attacker(bounded_by_hosts(initiator, responder)) phase 0. (* Secrecy does work *)
+query attacker(new msg1id) phase 1. (* Forward secrecy does NOT work *)
+query attacker(new msg1id) phase 0. (* Secrecy does work *)
+query attacker(new msg2id) phase 1. (* Forward secrecy does NOT work *)
+query attacker(new msg2id) phase 0. (* Secrecy does work *)
 query event(here).
 
 (*Injective agreement*)
-query A:host, B:host, p:bitstring; event (endResponder(A,B,p)) ==> event(startInitiator(A,B,p)).
+query A:host, B:host, p:bitstring; inj-event (endResponder(A,B,p)) ==> inj-event(startInitiator(A,B,p)).
+(*)
 query A:host, B:host, p:bitstring; event (sendResponder(A,B,bounded_by(p))) ==> event(startInit(A,B,p)).
 
 (*Request-response binding: An attacker should not be able to make a
       client match a response to the wrong request. *)
+      (*)
 query token:bitstring, security_context:bitstring, fake_security_context:bitstring; event(response_binding(token, fake_security_context)) ==> event (request_binding(token, security_context)).
 (*
 Non-replayability: An attacker should not be able to cause the
@@ -140,7 +143,8 @@ table token_to_message_lookup(host, bitstring, bitstring).
 table replay_window(host, bitstring).
 
 let oscore_initiator =
-  in(c, (identity: host));
+  in(c, (identity: host, endpoint: host));
+	if identity = initiator || identity = responder then
   new token : bitstring; (*Randomly generated token! The Token value is used to
    correlate requests and responses.*)
   new messageid : bitstring; (*Randomly genereated ID!
@@ -209,14 +213,13 @@ let oscore_initiator =
     ciphertext) in
   let security_context = (endpoint, senderID, recipientID, idcontext, partial_iv, aead_nonce) in
   insert token_to_message_lookup(identity, token, security_context);
-  event request_binding(token, security_context);
   event startInitiator(identity, endpoint, plaintext);
-  event startInit(identity, endpoint, (CoAP_GETCode, isLightBulbTurnedOn));
   out(c, msg_1).
 
 let oscore_initiator_response_receiver =
 (*Extend to allow messages to send ACK if confirmable*)
   in(c, (identity: host));
+  if identity = initiator || identity = responder then
   in(c, (=coap_version_one, =non_confirmable,
       tlength: bitstring, discard : bitstring,
       messageid : bitstring, token: bitstring,
@@ -233,7 +236,8 @@ let oscore_initiator_response_receiver =
   event responseReceived(identity, endpoint, plaintext).
 
 let oscore_responder =
-  in(c, identity: host);
+  in(c, (identity: host, endpoint: host));
+  if identity = initiator || identity = responder then
   in(c, (=coap_version_one, T:bitstring,
         tlength: bitstring, discard : bitstring,
         messageid : bitstring, token: bitstring,
@@ -269,7 +273,7 @@ let oscore_responder =
   (*   8.  The decrypted CoAP request is processed according to [RFC7252].
       We know that the message is a GET request, with a single response. So we generate a response from the plaintext!
   *)
-  new msg_2id : bitstring;
+  new msg2id : bitstring;
 
   new responseId : bitstring;
   (*To enable the receiver
@@ -278,7 +282,7 @@ let oscore_responder =
   let responsePayload = bounded_by(plaintext) in (*Response payload is bounded by the plaintext*)
   let sender_info = (senderID, idcontext, AES_CCM, label_key) in let senderKey = HKDF(msecret, msalt, sender_info, alg_key_length(AES_CCM, label_key)) in
    (*Using the AEAD nonce from the request *)
-  let sender_ciphertext = aeadEncrypt(senderKey, aead_nonce, ((plaintext, CoAP_CONTENTCode), msg_2id), aad) in
+  let sender_ciphertext = aeadEncrypt(senderKey, aead_nonce, ((CoAP_CONTENTCode, responsePayload), msg2id), aad) in
   let msg_2 = (
     (*Header*)
     coap_version_one,
@@ -290,8 +294,7 @@ let oscore_responder =
     token,
     empty,
     sender_ciphertext) in
-  event endResponder(endpoint, identity, (plaintext, identifier));
-  event sendResponder(endpoint, identity, responsePayload);
+  event endResponder(identity, endpoint, plaintext);
   out(c, msg_2).
 
 let init =
