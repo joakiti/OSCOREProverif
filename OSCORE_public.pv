@@ -42,7 +42,6 @@ free initiator, responder : host.
 fun HKDF(bitstring, bitstring, bitstring, bitstring): key.
 fun alg_key_length(bitstring, bitstring): bitstring.
 fun bounded_by(bitstring):bitstring.
-fun bounded_by_hosts(host, host):bitstring.
 fun aeadEncrypt(key, nonce, bitstring, bitstring): bitstring.
 
 event here.
