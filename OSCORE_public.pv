@@ -84,7 +84,6 @@ let oscore_initiator =
 
   let cvInfo = (emptyId, idcontext, AES_CCM, label_iv) in let CommonIv = HKDF(msecret, msalt, cvInfo, alg_key_length(AES_CCM, label_iv)) in
   let senderInfo = (senderID, idcontext, AES_CCM, label_key) in let senderKey = HKDF(msecret, msalt, senderInfo, alg_key_length(AES_CCM, label_key)) in
-  let recipientInfo = (recipientID, idcontext, AES_CCM, label_key) in let recipientKey = HKDF(msecret, msalt, recipientInfo, alg_key_length(AES_CCM, label_key)) in
 
   let aad = (encrypt0, oscore_version_one, AES_CCM, senderID, partial_iv) in
   let aead_nonce = aeadNonce(senderID, partial_iv, CommonIv) in
