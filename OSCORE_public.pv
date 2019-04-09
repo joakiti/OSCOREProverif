@@ -37,31 +37,14 @@ const AES_CCM: bitstring.
 (* HKDF *)
 const HKDF_256: bitstring.
 
-free initiator, responder : host.
+free initiator, responder, intruder : host.
 
 fun HKDF(bitstring, bitstring, bitstring, bitstring): key.
 fun alg_key_length(bitstring, bitstring): bitstring.
 fun bounded_by(bitstring):bitstring.
 fun aeadEncrypt(key, nonce, bitstring, bitstring): bitstring.
 
-event here.
-event responseReceived(host, host, bitstring).
-event startInitiator(host, host, bitstring).
-event endResponder(host, host, bitstring).
-
 free msg1id, msg2id : bitstring[private].
-(*Forward secrecy*)
-query attacker(msg1id) phase 1.
-query attacker(msg2id) phase 1.
-
-(*Secrecy*)
-query attacker(msg1id) phase 0.
-query attacker(msg2id) phase 0.
-
-query event(here).
-
-(*Non-injective agreement*)
-query A:host, B:host, p:bitstring; inj-event (responseReceived(A,B, bounded_by(p))) ==> (inj-event(endResponder(A,B,p)) ==> inj-event(startInitiator(A,B,p))).
 
 fun aeadNonce(id, bitstring, key) : nonce.
 
@@ -72,30 +55,63 @@ table security_context_lookup(host, host, id, id, bitstring, bitstring, bitstrin
 table token_to_message_lookup(host, bitstring, bitstring).
 table replay_window(host, bitstring).
 
+(*Forward secrecy*)
+query attacker(msg1id) phase 1.
+query attacker(msg2id) phase 1.
+
+(*Secrecy*)
+(*This is false because the attacker is part of the model, and the processes willingly send their secret to him*)
+query attacker(msg1id) phase 0.
+query attacker(msg2id) phase 0.
+
+event beginInitiator(host, host).
+event beginResponder(host, host).
+
+event endResponder(host, host).
+event endInitiator(host, host).
+
+event here.
+
+query event(here).
+
+(*Injective agreement*)
+(*This is false, as it should be, because we dont have the replay window functionality in place*)
+query init:host, res:host; inj-event(endResponder(init, res)) ==> inj-event(beginInitiator(init, res)).
+
+(*This is true, however, it should not be. There is nothing stopping an attacker from replaying a message.*)
+query init:host, res:host; inj-event(endInitiator(init, res)) ==> inj-event(endResponder(init, res)).
+
+
 let oscore_initiator =
   in(c, identity:host);
   if identity = initiator || identity = responder then
-  new token : bitstring;
-  new messageid : bitstring;
-  new partial_iv: bitstring;
-  in(c, endpoint: host);
-  get security_context_lookup(=identity, =endpoint, senderID:id, recipientID:id, msecret:bitstring, msalt:bitstring, idcontext:bitstring) in
+    new token : bitstring;
+    new messageid : bitstring;
+    new partial_iv: bitstring;
+    in(c, endpoint: host);
+      event beginInitiator(identity, endpoint);
+    get security_context_lookup(=identity, =endpoint, senderID:id, recipientID:id, msecret:bitstring, msalt:bitstring, idcontext:bitstring) in
+      let cvInfo = (emptyId, idcontext, AES_CCM, label_iv) in let CommonIv = HKDF(msecret, msalt, cvInfo, alg_key_length(AES_CCM, label_iv)) in
+      let senderInfo = (senderID, idcontext, AES_CCM, label_key) in let senderKey = HKDF(msecret, msalt, senderInfo, alg_key_length(AES_CCM, label_key)) in
 
-  let cvInfo = (emptyId, idcontext, AES_CCM, label_iv) in let CommonIv = HKDF(msecret, msalt, cvInfo, alg_key_length(AES_CCM, label_iv)) in
-  let senderInfo = (senderID, idcontext, AES_CCM, label_key) in let senderKey = HKDF(msecret, msalt, senderInfo, alg_key_length(AES_CCM, label_key)) in
+      let aad = (encrypt0, oscore_version_one, AES_CCM, senderID, partial_iv) in
+      let aead_nonce = aeadNonce(senderID, partial_iv, CommonIv) in
+      let plaintext = ((CoAP_GETCode, isLightBulbTurnedOn), msg1id) in
+      let ciphertext = aeadEncrypt(senderKey, aead_nonce, plaintext, aad) in
+      let oscore_option = (partial_iv, senderID, idcontext) in
+      let security_context = (endpoint, senderID, recipientID, idcontext, partial_iv, aead_nonce) in
+      insert token_to_message_lookup(identity, token, security_context);
 
-  let aad = (encrypt0, oscore_version_one, AES_CCM, senderID, partial_iv) in
-  let aead_nonce = aeadNonce(senderID, partial_iv, CommonIv) in
+      if endpoint <> intruder then
+        let msg_1 = (non_confirmable, CoAP_POSTCode, messageid, token, oscore_option, ciphertext) in
+        out(c, msg_1)
+      else (
+        let plaintext = ((CoAP_GETCode, isLightBulbTurnedOn)) in
+        let ciphertext = aeadEncrypt(senderKey, aead_nonce, plaintext, aad) in
+        let msg_1 = (non_confirmable, CoAP_POSTCode, messageid, token, oscore_option, ciphertext) in
+        out(c, msg_1)
+        ).
 
-  let plaintext = ((CoAP_GETCode, isLightBulbTurnedOn), msg1id) in
-  let ciphertext = aeadEncrypt(senderKey, aead_nonce, plaintext, aad) in
-  let oscore_option = (partial_iv, senderID, idcontext) in
-  let msg_1 = (non_confirmable, CoAP_POSTCode, messageid, token, oscore_option, ciphertext) in
-  let security_context = (endpoint, senderID, recipientID, idcontext, partial_iv, aead_nonce) in
-
-  insert token_to_message_lookup(identity, token, security_context);
-  event startInitiator(identity, endpoint, (CoAP_GETCode, isLightBulbTurnedOn));
-  out(c, msg_1).
 
 let oscore_initiator_response_receiver =
   in(c, identity:host);
@@ -109,58 +125,69 @@ let oscore_initiator_response_receiver =
     let aad = (encrypt0, oscore_version_one, AES_CCM, senderID, partial_iv) in
     let recipientInfo = (recipientID, idcontext, AES_CCM, label_key) in let recipientKey = HKDF(msecret, msalt, recipientInfo, alg_key_length(AES_CCM, label_key)) in
     let (plaintext:bitstring, identifier:bitstring) = aeadDecrypt(ciphertext, recipientKey, aead_nonce, aad) in
-    event responseReceived(identity, endpoint, plaintext);
+    if endpoint = initiator || endpoint = responder then
+    event endInitiator(identity, endpoint);
     event here
-    )
+  )
   else
   (*Derive a new aead nonce*)
   0.
+
 let oscore_responder =
   in(c, identity:host);
   if identity = initiator || identity = responder then
-  in(c, (T:bitstring, dummyCode : bitstring, messageid : bitstring, token: bitstring, OSCORE:bitstring, ciphertext:bitstring));
-  let (partial_iv:bitstring, recipientID:id, idcontext:bitstring) = OSCORE in
-  (
-    if T = confirmable then
-      out(c, (acknowledgement, CoAP_EMPTYCode, messageid))
-  )
-    |
-  (
-    get security_context_lookup(=identity, endpoint:host, senderID:id, =recipientID, msecret:bitstring, msalt:bitstring, =idcontext) in (*Find a security context with endpoint*)
-    let cvInfo = (emptyId, idcontext, AES_CCM, label_iv) in let commonIV = HKDF(msecret, msalt, cvInfo, alg_key_length(AES_CCM, label_iv)) in
-    let recipientInfo = (recipientID, idcontext, AES_CCM, label_key) in let recipientKey = HKDF(msecret, msalt, recipientInfo, alg_key_length(AES_CCM, label_key)) in
-    let aad = (encrypt0, oscore_version_one, AES_CCM, recipientID, partial_iv) in
-    let aead_nonce = aeadNonce(recipientID, partial_iv, commonIV) in
+    in(c, (T:bitstring, dummyCode : bitstring, messageid : bitstring, token: bitstring, OSCORE:bitstring, ciphertext:bitstring));
+    let (partial_iv:bitstring, recipientID:id, idcontext:bitstring) = OSCORE in
+    (
+      if T = confirmable then
+        out(c, (acknowledgement, CoAP_EMPTYCode, messageid))
+    )
+      |
+    (
+      get security_context_lookup(=identity, endpoint:host, senderID:id, =recipientID, msecret:bitstring, msalt:bitstring, =idcontext) in (*Find a security context with endpoint*)
+        event beginResponder(endpoint, identity);
+      let cvInfo = (emptyId, idcontext, AES_CCM, label_iv) in let commonIV = HKDF(msecret, msalt, cvInfo, alg_key_length(AES_CCM, label_iv)) in
+      let recipientInfo = (recipientID, idcontext, AES_CCM, label_key) in let recipientKey = HKDF(msecret, msalt, recipientInfo, alg_key_length(AES_CCM, label_key)) in
+      let aad = (encrypt0, oscore_version_one, AES_CCM, recipientID, partial_iv) in
+      let aead_nonce = aeadNonce(recipientID, partial_iv, commonIV) in
 
-    let (plaintext:bitstring, identifier:bitstring) = aeadDecrypt(ciphertext, recipientKey, aead_nonce, aad) in
-    get replay_window(=identity, partial:bitstring) suchthat partial = partial_iv else
-    insert replay_window(identity, partial_iv);
+      let (plaintextreceived:bitstring, identifier:bitstring) = aeadDecrypt(ciphertext, recipientKey, aead_nonce, aad) in
 
-    new responseId : bitstring;
+      new responseId : bitstring;
+      let responsePayload = bounded_by(plaintextreceived) in (*Response payload is bounded by the plaintext*)
+      let sender_info = (senderID, idcontext, AES_CCM, label_key) in let senderKey = HKDF(msecret, msalt, sender_info, alg_key_length(AES_CCM, label_key)) in
+      let sender_ciphertext = aeadEncrypt(senderKey, aead_nonce, ((CoAP_CONTENTCode, responsePayload), msg2id), aad) in
+      let msg_2 = (non_confirmable, CoAP_CHANGEDCode, responseId, token, empty, sender_ciphertext) in
 
-    let responsePayload = bounded_by(plaintext) in (*Response payload is bounded by the plaintext*)
-    let sender_info = (senderID, idcontext, AES_CCM, label_key) in let senderKey = HKDF(msecret, msalt, sender_info, alg_key_length(AES_CCM, label_key)) in
-    let sender_ciphertext = aeadEncrypt(senderKey, aead_nonce, ((CoAP_CONTENTCode, responsePayload), msg2id), aad) in
-    let msg_2 = (non_confirmable, CoAP_CHANGEDCode, responseId, token, empty, sender_ciphertext) in
-    event endResponder(endpoint, identity, plaintext);
-    out(c, msg_2)
+      if endpoint <> intruder then
+        event endResponder(endpoint, identity);
+        out(c, msg_2)
+      else (
+        let responsePayload = bounded_by(plaintextreceived) in (*Response payload is bounded by the plaintext*)
+        let sender_ciphertext = aeadEncrypt(senderKey, aead_nonce, (CoAP_CONTENTCode, responsePayload), aad) in
+        let msg_2 = (non_confirmable, CoAP_CHANGEDCode, responseId, token, empty, sender_ciphertext) in
+        out(c, msg_2)
+        )
   ).
 
-let init =
-  in(c, (a: host, b: host, senderID:id, recipientID:id, ms: bitstring, msalt:bitstring, idcontext: bitstring));
-  if a <> initiator && b <> responder then
-    if b <> initiator && a <> responder then
-      insert security_context_lookup(a, b, senderID, recipientID, ms, msalt, idcontext);
-      insert security_context_lookup(b, a, recipientID, senderID, ms, msalt, idcontext).
+  process
+    new IDir:id; new IDri:id; new msecret : bitstring; new msalt:bitstring; new idcontext: bitstring;
+    new AttackIDir:id; new AttackIDri:id; new Attackmsecret : bitstring; new Attackmsalt:bitstring; new Attackidcontext: bitstring;
+    out(c, (AttackIDir, AttackIDri, Attackmsecret, Attackmsalt, Attackidcontext));
+    (*Consider a shared table where all users are well behaved, and ONLY reads rows which belongs to them*)
+    insert security_context_lookup(initiator, responder, IDir, IDri, msecret, msalt, idcontext);
+    insert security_context_lookup(responder, initiator, IDri, IDir, msecret, msalt, idcontext);
 
-process
-  new IDir:id; new IDri:id; new msecret : bitstring; new msalt:bitstring; new idcontext: bitstring;
-  (*Consider a shared table where all users are well behaved, and ONLY reads rows which belongs to them*)
-  insert security_context_lookup(initiator, responder, IDir, IDri, msecret, msalt, idcontext);
-  insert security_context_lookup(responder, initiator, IDri, IDir, msecret, msalt, idcontext);
-  (*These are the actors in our model*)
-  (!oscore_initiator) |
-  (!oscore_initiator_response_receiver) |
-  (!oscore_responder) |
-  (!init) |
-  (phase 1; out(c, (msecret, msalt)))
+    insert security_context_lookup(initiator, intruder, AttackIDir, AttackIDri, Attackmsecret, Attackmsalt, Attackidcontext);
+    insert security_context_lookup(intruder, initiator, AttackIDri, AttackIDir, Attackmsecret, Attackmsalt, Attackidcontext);
+
+    insert security_context_lookup(intruder, responder, AttackIDir, AttackIDri, Attackmsecret, Attackmsalt, Attackidcontext);
+    insert security_context_lookup(responder, intruder, AttackIDri, AttackIDir, Attackmsecret, Attackmsalt, Attackidcontext);
+    (*These are the actors in our model*)
+    out(c, (IDir, IDri, idcontext));
+
+    (!oscore_initiator) |
+    (!oscore_responder) |
+    (!oscore_initiator_response_receiver) |
+
+    (phase 1; out(c, (msecret, msalt)))
