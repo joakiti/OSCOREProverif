@@ -493,3 +493,4 @@ A response is identified by the Code field in the CoAP header being set to the C
 
 **Need help with**
 - I need to understand the security context deriviation protocol, and i'm currently not sure how it works. Both Alessandro and the authors might be able to help with this.
+- Why do the endpoints need 2 keys, instead of just using one?
