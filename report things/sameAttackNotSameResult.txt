@@ -1,0 +1,27 @@
+SSN in securityContext(A, B, seen).
+iknows(
+  res(
+    Token,
+    MessageID, %For the response, we create a new message ID
+    emptyID,
+    aeadEncrypt(
+       M, % And a new message payload
+       aad(senderID(A, B), SSN),
+       senderKey(masterSecret(A, B), contextID(A,B), senderID(A, B)),
+       nonce(senderID(A, B), SSN, commonIV(masterSecret(A,B), contextID(A, B), emptyID))
+      )
+  )).
+  iknows(M).
+  iknows(M2).
+  iknows(
+  res(
+    Token,
+    MessageID, %For the response, we create a new message ID
+    emptyID,
+    aeadEncrypt(
+       M2, % And a new message payload
+       aad(senderID(A, B), SSN),
+       senderKey(masterSecret(A, B), contextID(A,B), senderID(A, B)),
+       nonce(senderID(A, B), SSN, commonIV(masterSecret(A,B), contextID(A, B), emptyID))
+      )
+  )).
