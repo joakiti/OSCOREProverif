@@ -1,0 +1,193 @@
+pred iknows/1 elimVar,decompData.
+pred timplies/2.
+pred isHonest/1.
+pred isDishon/1.
+pred isAll/1.
+pred isSecretStatus/1.
+pred attack/0.
+pred occurs/1.
+nounif iknows:x.
+fun nothing/0.
+fun val/5.
+fun tokenRing/1.
+fun securityContext__valid/2.
+fun securityContext__used/2.
+fun securityContext__seen/2.
+fun request/2.
+fun inv/1.
+fun masterSecret/2.
+fun req/4.
+fun hash/2.
+fun res/4.
+fun requestAccepted/5.
+fun commonIV/3.
+fun aeadEncrypt/4.
+fun senderKey/3.
+fun responseAccepted/5.
+fun honest/1.
+fun dishon/1.
+fun zero/0.
+fun valid/0.
+fun used/0.
+fun seen/0.
+fun pair/2.
+fun senderID/2.
+fun contextID/2.
+fun emptyID/0.
+fun nonce/3.
+fun aad/2.
+query attack:.
+reduc
+
+(* userType *)
+isHonest:honest(vX);
+
+(* userType *)
+isDishon:dishon(vX);
+
+(* userType *)
+isHonest:vX -> isAll:vX;
+
+(* userType *)
+isDishon:vX -> isAll:vX;
+
+(* userType *)
+isSecretStatus:Cvalid[];
+isSecretStatus:Cused[];
+isSecretStatus:Cseen[];
+
+(* iKnowAll *)
+isAll:vA -> iknows:vA;
+
+(* iNonce *)
+iknows:vX & iknows:vY & iknows:vZ -> iknows:nonce(vX,vY,vZ);
+
+(* iAAD *)
+iknows:aad(vX,vY);
+
+(* iKnowReq *)
+iknows:req(vX,vY,vZ,vW) -> iknows:vX;
+iknows:req(vX,vY,vZ,vW) -> iknows:vY;
+iknows:req(vX,vY,vZ,vW) -> iknows:vZ;
+iknows:req(vX,vY,vZ,vW) -> iknows:vW;
+
+(* iKnowRes *)
+iknows:res(vX,vY,vZ,vW) -> iknows:vX;
+iknows:res(vX,vY,vZ,vW) -> iknows:vY;
+iknows:res(vX,vY,vZ,vW) -> iknows:vZ;
+iknows:res(vX,vY,vZ,vW) -> iknows:vW;
+
+(* iDecrypt *)
+iknows:aeadEncrypt(vX,vY,vZ,vW) & iknows:vY & iknows:vZ & iknows:vW -> iknows:vX;
+
+(* iKnowContext *)
+isAll:vA & isAll:vB -> iknows:senderID(vA,vB);
+isAll:vA & isAll:vB -> iknows:senderID(vB,vA);
+isAll:vA & isAll:vB -> iknows:contextID(vA,vB);
+
+(* init *)
+iknows:val(Num0[],Num0[],Num0[],Num0[],Num0[]);
+occurs:val(Num0[],Num0[],Num0[],Num0[],Num0[]);
+
+(* timplies *)
+iknows:vVal_1 & timplies:vVal_1,vVal_2 -> iknows:vVal_2;
+
+(* timplies *)
+occurs:vVal_1 & timplies:vVal_1,vVal_2 -> occurs:vVal_2;
+
+(* a2 *)
+iknows:pair(vM1,vM2) -> iknows:vM1;
+iknows:pair(vM1,vM2) -> iknows:vM2;
+
+(* a3 *)
+iknows:vM1 & iknows:vM2 -> iknows:pair(vM1,vM2);
+
+(* iKnow *)
+isHonest:vA & isHonest:vB -> iknows:val(Num0[],securityContext__valid(vA,vB),Num0[],Num0[],Num0[]);
+isHonest:vA & isHonest:vB -> occurs:val(Num0[],securityContext__valid(vA,vB),Num0[],Num0[],Num0[]);
+
+(* timplies *)
+isHonest:vA & isHonest:vB & iknows:vVal_1 & timplies:vVal_1,vVal_2 -> iknows:vVal_2;
+
+(* timplies *)
+isHonest:vA & isHonest:vB & occurs:vVal_1 & timplies:vVal_1,vVal_2 -> occurs:vVal_2;
+
+(* iKnowDis *)
+isHonest:vA & isDishon:vB -> iknows:val(Num0[],securityContext__valid(vA,vB),Num0[],Num0[],Num0[]);
+isHonest:vA & isDishon:vB -> iknows:masterSecret(vA,vB);
+isHonest:vA & isDishon:vB -> occurs:val(Num0[],securityContext__valid(vA,vB),Num0[],Num0[],Num0[]);
+
+(* timplies *)
+isHonest:vA & isDishon:vB & iknows:vVal_1 & timplies:vVal_1,vVal_2 -> iknows:vVal_2;
+
+(* timplies *)
+isHonest:vA & isDishon:vB & occurs:vVal_1 & timplies:vVal_1,vVal_2 -> occurs:vVal_2;
+
+(* iDeriveKeys *)
+isAll:vA & isAll:vB & iknows:masterSecret(vA,vB) & iknows:contextID(vA,vB) & iknows:senderID(vA,vB) & iknows:senderID(vB,vA) -> iknows:senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vA,vB));
+isAll:vA & isAll:vB & iknows:masterSecret(vA,vB) & iknows:contextID(vA,vB) & iknows:senderID(vA,vB) & iknows:senderID(vB,vA) -> iknows:senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vB,vA));
+isAll:vA & isAll:vB & iknows:masterSecret(vA,vB) & iknows:contextID(vA,vB) & iknows:senderID(vA,vB) & iknows:senderID(vB,vA) -> iknows:commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[]);
+
+(* iSendRequest *)
+isHonest:vA & isAll:vB & occurs:val(vE__tokenRing__M,vE__securityContext__valid__M,vE__securityContext__used__M,vE__securityContext__seen__M,vE__request__M) & occurs:val(vE__tokenRing__SSN,securityContext__valid(vA,vB),Num0[],vE__securityContext__seen__SSN,vE__request__SSN) -> iknows:req(val(Num0[],Num0[],Num0[],Num0[],Num0[]),val(Num0[],Num0[],Num0[],Num0[],Num0[]),pair(senderID(vA,vB),val(vE__tokenRing__SSN,Num0[],securityContext__used(vA,vB),vE__securityContext__seen__SSN,vE__request__SSN)),aeadEncrypt(hash(vA,vB),aad(senderID(vA,vB),val(vE__tokenRing__SSN,Num0[],securityContext__used(vA,vB),vE__securityContext__seen__SSN,vE__request__SSN)),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vA,vB)),nonce(senderID(vA,vB),val(vE__tokenRing__SSN,Num0[],securityContext__used(vA,vB),vE__securityContext__seen__SSN,vE__request__SSN),commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[]))));
+isHonest:vA & isAll:vB & occurs:val(vE__tokenRing__M,vE__securityContext__valid__M,vE__securityContext__used__M,vE__securityContext__seen__M,vE__request__M) & occurs:val(vE__tokenRing__SSN,securityContext__valid(vA,vB),Num0[],vE__securityContext__seen__SSN,vE__request__SSN) -> occurs:val(Num0[],Num0[],Num0[],Num0[],Num0[]);
+isHonest:vA & isAll:vB & occurs:val(vE__tokenRing__M,vE__securityContext__valid__M,vE__securityContext__used__M,vE__securityContext__seen__M,vE__request__M) & occurs:val(vE__tokenRing__SSN,securityContext__valid(vA,vB),Num0[],vE__securityContext__seen__SSN,vE__request__SSN) -> occurs:val(Num0[],Num0[],Num0[],Num0[],Num0[]);
+isHonest:vA & isAll:vB & occurs:val(vE__tokenRing__M,vE__securityContext__valid__M,vE__securityContext__used__M,vE__securityContext__seen__M,vE__request__M) & occurs:val(vE__tokenRing__SSN,securityContext__valid(vA,vB),Num0[],vE__securityContext__seen__SSN,vE__request__SSN) -> timplies:val(vE__tokenRing__SSN,securityContext__valid(vA,vB),Num0[],vE__securityContext__seen__SSN,vE__request__SSN),val(vE__tokenRing__SSN,Num0[],securityContext__used(vA,vB),vE__securityContext__seen__SSN,vE__request__SSN);
+
+(* timplies *)
+isHonest:vA & isAll:vB & iknows:req(vVal_1,vMessageID,pair(senderID(vA,vB),vSSN),aeadEncrypt(hash(vA,vB),aad(senderID(vA,vB),vSSN),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vA,vB)),nonce(senderID(vA,vB),vSSN,commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[])))) & timplies:vVal_1,vVal_2 -> iknows:req(vVal_2,vMessageID,pair(senderID(vA,vB),vSSN),aeadEncrypt(hash(vA,vB),aad(senderID(vA,vB),vSSN),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vA,vB)),nonce(senderID(vA,vB),vSSN,commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[]))));
+
+(* timplies *)
+isHonest:vA & isAll:vB & iknows:req(vToken,vVal_1,pair(senderID(vA,vB),vSSN),aeadEncrypt(hash(vA,vB),aad(senderID(vA,vB),vSSN),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vA,vB)),nonce(senderID(vA,vB),vSSN,commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[])))) & timplies:vVal_1,vVal_2 -> iknows:req(vToken,vVal_2,pair(senderID(vA,vB),vSSN),aeadEncrypt(hash(vA,vB),aad(senderID(vA,vB),vSSN),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vA,vB)),nonce(senderID(vA,vB),vSSN,commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[]))));
+
+(* timplies *)
+isHonest:vA & isAll:vB & iknows:req(vToken,vMessageID,pair(senderID(vA,vB),vVal_1),aeadEncrypt(hash(vA,vB),aad(senderID(vA,vB),vVal_1),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vA,vB)),nonce(senderID(vA,vB),vVal_1,commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[])))) & timplies:vVal_1,vVal_2 -> iknows:req(vToken,vMessageID,pair(senderID(vA,vB),vVal_2),aeadEncrypt(hash(vA,vB),aad(senderID(vA,vB),vVal_2),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vA,vB)),nonce(senderID(vA,vB),vVal_2,commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[]))));
+
+(* timplies *)
+isHonest:vA & isAll:vB & occurs:vVal_1 & timplies:vVal_1,vVal_2 -> occurs:vVal_2;
+
+(* iSendRequest__multifamily *)
+isAll:vSSN__securityContext__used__1 & isAll:vSSN__securityContext__used__2 & isHonest:vA & isAll:vB & occurs:val(vE__tokenRing__M,vE__securityContext__valid__M,vE__securityContext__used__M,vE__securityContext__seen__M,vE__request__M) & occurs:val(vE__tokenRing__SSN,securityContext__valid(vA,vB),securityContext__used(vSSN__securityContext__used__1,vSSN__securityContext__used__2),vE__securityContext__seen__SSN,vE__request__SSN) -> attack:;
+isAll:vSSN__securityContext__used__1 & isAll:vSSN__securityContext__used__2 & isHonest:vA & isAll:vB & occurs:val(vE__tokenRing__M,vE__securityContext__valid__M,vE__securityContext__used__M,vE__securityContext__seen__M,vE__request__M) & occurs:val(vE__tokenRing__SSN,securityContext__valid(vA,vB),securityContext__used(vSSN__securityContext__used__1,vSSN__securityContext__used__2),vE__securityContext__seen__SSN,vE__request__SSN) -> timplies:val(vE__tokenRing__SSN,securityContext__valid(vA,vB),securityContext__used(vSSN__securityContext__used__1,vSSN__securityContext__used__2),vE__securityContext__seen__SSN,vE__request__SSN),val(vE__tokenRing__SSN,Num0[],Num0[],vE__securityContext__seen__SSN,vE__request__SSN);
+
+(* iSendResponse *)
+isAll:vB & isHonest:vA & occurs:val(vE__tokenRing__M,vE__securityContext__valid__M,vE__securityContext__used__M,vE__securityContext__seen__M,vE__request__M) & occurs:val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN) & occurs:val(vE__tokenRing__Token,vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token) -> iknows:res(val(vE__tokenRing__Token,vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token),val(Num0[],Num0[],Num0[],Num0[],Num0[]),CemptyID[],aeadEncrypt(hash(vB,vA),aad(senderID(vA,vB),val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN)),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vB,vA)),nonce(senderID(vA,vB),val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN),commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[]))));
+isAll:vB & isHonest:vA & occurs:val(vE__tokenRing__M,vE__securityContext__valid__M,vE__securityContext__used__M,vE__securityContext__seen__M,vE__request__M) & occurs:val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN) & occurs:val(vE__tokenRing__Token,vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token) -> occurs:val(Num0[],Num0[],Num0[],Num0[],Num0[]);
+
+(* timplies *)
+isAll:vB & isHonest:vA & iknows:res(vVal_1,vMessageID,CemptyID[],aeadEncrypt(hash(vB,vA),aad(senderID(vA,vB),vSSN),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vB,vA)),nonce(senderID(vA,vB),vSSN,commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[])))) & timplies:vVal_1,vVal_2 -> iknows:res(vVal_2,vMessageID,CemptyID[],aeadEncrypt(hash(vB,vA),aad(senderID(vA,vB),vSSN),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vB,vA)),nonce(senderID(vA,vB),vSSN,commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[]))));
+
+(* timplies *)
+isAll:vB & isHonest:vA & iknows:res(vToken,vVal_1,CemptyID[],aeadEncrypt(hash(vB,vA),aad(senderID(vA,vB),vSSN),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vB,vA)),nonce(senderID(vA,vB),vSSN,commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[])))) & timplies:vVal_1,vVal_2 -> iknows:res(vToken,vVal_2,CemptyID[],aeadEncrypt(hash(vB,vA),aad(senderID(vA,vB),vSSN),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vB,vA)),nonce(senderID(vA,vB),vSSN,commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[]))));
+
+(* timplies *)
+isAll:vB & isHonest:vA & iknows:res(vToken,vMessageID,CemptyID[],aeadEncrypt(hash(vB,vA),aad(senderID(vA,vB),vVal_1),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vB,vA)),nonce(senderID(vA,vB),vVal_1,commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[])))) & timplies:vVal_1,vVal_2 -> iknows:res(vToken,vMessageID,CemptyID[],aeadEncrypt(hash(vB,vA),aad(senderID(vA,vB),vVal_2),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vB,vA)),nonce(senderID(vA,vB),vVal_2,commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[]))));
+
+(* timplies *)
+isAll:vB & isHonest:vA & occurs:vVal_1 & timplies:vVal_1,vVal_2 -> occurs:vVal_2;
+
+(* iVerifyRequest *)
+isAll:vB & isHonest:vA & iknows:req(val(vE__tokenRing__Token,vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token),val(vE__tokenRing__MessageID,vE__securityContext__valid__MessageID,vE__securityContext__used__MessageID,vE__securityContext__seen__MessageID,vE__request__MessageID),pair(senderID(vA,vB),val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,Num0[],vE__request__SSN)),aeadEncrypt(vM,aad(senderID(vA,vB),val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,Num0[],vE__request__SSN)),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vA,vB)),nonce(senderID(vA,vB),val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,Num0[],vE__request__SSN),commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[])))) & iknows:vM & occurs:val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,Num0[],vE__request__SSN) & occurs:val(vE__tokenRing__Token,vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token) & occurs:val(vE__tokenRing__MessageID,vE__securityContext__valid__MessageID,vE__securityContext__used__MessageID,vE__securityContext__seen__MessageID,vE__request__MessageID) -> iknows:requestAccepted(val(vE__tokenRing__Token,vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token),vM,val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,securityContext__seen(vA,vB),vE__request__SSN),vA,vB);
+isAll:vB & isHonest:vA & iknows:req(val(vE__tokenRing__Token,vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token),val(vE__tokenRing__MessageID,vE__securityContext__valid__MessageID,vE__securityContext__used__MessageID,vE__securityContext__seen__MessageID,vE__request__MessageID),pair(senderID(vA,vB),val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,Num0[],vE__request__SSN)),aeadEncrypt(vM,aad(senderID(vA,vB),val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,Num0[],vE__request__SSN)),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vA,vB)),nonce(senderID(vA,vB),val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,Num0[],vE__request__SSN),commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[])))) & iknows:vM & occurs:val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,Num0[],vE__request__SSN) & occurs:val(vE__tokenRing__Token,vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token) & occurs:val(vE__tokenRing__MessageID,vE__securityContext__valid__MessageID,vE__securityContext__used__MessageID,vE__securityContext__seen__MessageID,vE__request__MessageID) -> timplies:val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,Num0[],vE__request__SSN),val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,securityContext__seen(vA,vB),vE__request__SSN);
+
+(* timplies *)
+isAll:vB & isHonest:vA & iknows:requestAccepted(vVal_1,vM,vSSN,vA,vB) & timplies:vVal_1,vVal_2 -> iknows:requestAccepted(vVal_2,vM,vSSN,vA,vB);
+
+(* timplies *)
+isAll:vB & isHonest:vA & iknows:requestAccepted(vToken,vM,vVal_1,vA,vB) & timplies:vVal_1,vVal_2 -> iknows:requestAccepted(vToken,vM,vVal_2,vA,vB);
+
+(* iVerifyResponse *)
+isHonest:vA & isAll:vB & iknows:res(val(tokenRing(vA),vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token),val(vE__tokenRing__MessageID,vE__securityContext__valid__MessageID,vE__securityContext__used__MessageID,vE__securityContext__seen__MessageID,vE__request__MessageID),CemptyID[],aeadEncrypt(vM,aad(senderID(vA,vB),val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN)),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vB,vA)),nonce(senderID(vA,vB),val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN),commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[])))) & iknows:vM & occurs:val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN) & occurs:val(tokenRing(vA),vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token) & occurs:val(vE__tokenRing__MessageID,vE__securityContext__valid__MessageID,vE__securityContext__used__MessageID,vE__securityContext__seen__MessageID,vE__request__MessageID) -> iknows:responseAccepted(val(Num0[],vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token),vM,val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN),vB,vA);
+isHonest:vA & isAll:vB & iknows:res(val(tokenRing(vA),vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token),val(vE__tokenRing__MessageID,vE__securityContext__valid__MessageID,vE__securityContext__used__MessageID,vE__securityContext__seen__MessageID,vE__request__MessageID),CemptyID[],aeadEncrypt(vM,aad(senderID(vA,vB),val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN)),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vB,vA)),nonce(senderID(vA,vB),val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN),commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[])))) & iknows:vM & occurs:val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN) & occurs:val(tokenRing(vA),vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token) & occurs:val(vE__tokenRing__MessageID,vE__securityContext__valid__MessageID,vE__securityContext__used__MessageID,vE__securityContext__seen__MessageID,vE__request__MessageID) -> timplies:val(tokenRing(vA),vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token),val(Num0[],vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token);
+
+(* timplies *)
+isHonest:vA & isAll:vB & iknows:responseAccepted(vVal_1,vM,vSSN,vB,vA) & timplies:vVal_1,vVal_2 -> iknows:responseAccepted(vVal_2,vM,vSSN,vB,vA);
+
+(* timplies *)
+isHonest:vA & isAll:vB & iknows:responseAccepted(vToken,vM,vVal_1,vB,vA) & timplies:vVal_1,vVal_2 -> iknows:responseAccepted(vToken,vM,vVal_2,vB,vA);
+
+(* secrecyReq *)
+isHonest:vA & isHonest:vB & iknows:req(val(vE__tokenRing__Token,vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token),val(vE__tokenRing__MessageID,vE__securityContext__valid__MessageID,vE__securityContext__used__MessageID,vE__securityContext__seen__MessageID,vE__request__MessageID),pair(senderID(vA,vB),val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN)),aeadEncrypt(vM,aad(senderID(vA,vB),val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN)),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vA,vB)),nonce(senderID(vA,vB),val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN),commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[])))) & iknows:requestAccepted(val(vE__tokenRing__Token,vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token),vM,val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN),vA,vB) & occurs:val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN) & occurs:val(vE__tokenRing__Token,vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token) & occurs:val(vE__tokenRing__MessageID,vE__securityContext__valid__MessageID,vE__securityContext__used__MessageID,vE__securityContext__seen__MessageID,vE__request__MessageID) -> attack:;
+
+(* secrecyResp *)
+isHonest:vA & isDishon:vB & iknows:res(val(vE__tokenRing__Token,vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token),val(vE__tokenRing__MessageID,vE__securityContext__valid__MessageID,vE__securityContext__used__MessageID,vE__securityContext__seen__MessageID,vE__request__MessageID),CemptyID[],aeadEncrypt(vM,aad(senderID(vA,vB),val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN)),senderKey(masterSecret(vA,vB),contextID(vA,vB),senderID(vB,vA)),nonce(senderID(vA,vB),val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN),commonIV(masterSecret(vA,vB),contextID(vA,vB),CemptyID[])))) & iknows:responseAccepted(val(vE__tokenRing__Token,vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token),vM,val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN),vB,vA) & occurs:val(vE__tokenRing__SSN,vE__securityContext__valid__SSN,vE__securityContext__used__SSN,vE__securityContext__seen__SSN,vE__request__SSN) & occurs:val(vE__tokenRing__Token,vE__securityContext__valid__Token,vE__securityContext__used__Token,vE__securityContext__seen__Token,vE__request__Token) & occurs:val(vE__tokenRing__MessageID,vE__securityContext__valid__MessageID,vE__securityContext__used__MessageID,vE__securityContext__seen__MessageID,vE__request__MessageID) -> attack:.

@@ -1,7 +1,5 @@
 # OSCOREProverif
 This is the ProVerif model developed in association with the formal verification of OSCORE.
-OSCORE NOTES
-
 CBOR
  -
   - OSCORE uses untagged COSE_Encrypt0 structure, with AEAD.
@@ -488,3 +486,9 @@ A response is identified by the Code field in the CoAP header being set to the C
 - Updating the replay window is not currently atomic, so replay attacks can occur. (Much like two processes running the same security context but not synchronized)
 - Partial IV is not increased incrementally for each request.
 - Unsure about the complexities regarding the Partial IV in observations
+- The OSCORE option is relatively naive in that its just a tuple. Probably change
+
+
+**Need help with**
+- I need to understand the security context deriviation protocol, and i'm currently not sure how it works. Both Alessandro and the authors might be able to help with this.
+- Why do the endpoints need 2 keys, instead of just using one?

@@ -46,6 +46,11 @@ fun aeadEncrypt(key, nonce, bitstring, bitstring): bitstring.
 
 fun aeadNonce(id, bitstring, key) : nonce.
 
+(* iDecrypt...
+ iknows(aeadEncrypt(k, n, plaintext, aad)) .
+ iknows(k).
+ iknows(n).
+ iknows(aad) => iknows(plaintext). *)
 reduc forall plaintext: bitstring, n: nonce, k: key, aad: bitstring; aeadDecrypt(aeadEncrypt(k, n, plaintext, aad), k, n, aad) = plaintext.
 reduc forall plaintext: bitstring, n: nonce, k: key, aad: bitstring; decrypt(aeadEncrypt(k, n, plaintext, aad), k, n) = plaintext.
 

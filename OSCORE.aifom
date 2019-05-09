@@ -1,0 +1,261 @@
+Problem: OSCORE;
+
+Types:
+Honest  = {...};
+Dishon  = {...};
+All   = Honest++Dishon;
+SecretStatus = {valid, used, seen};
+
+Sets:
+ %In here, maybe we can put all observed data from the endpoints communicating
+ tokenRing(All),
+
+ securityContext(All, All, SecretStatus),
+ request(All, All);
+      % security context for an honest endpoint:
+ 			% - endpoint A,
+			% - endpoint B, - they own the security context
+			% - status of the respective exchange
+
+Functions:
+
+% functions that represent (in an abstract way) the message formats:
+public
+pair/2,
+senderID/2,
+contextID/2,
+emptyID/0,
+nonce/3,
+%let msg_1 = (messageid, token, oscore_option, ciphertext) in
+aad/2;
+%let msg_2 = (responseId, token (same as msg1), sender_ciphertext) in
+
+private
+inv/1,
+masterSecret/2,
+req/4,
+hash/2,
+res/4,
+requestAccepted/5,
+commonIV/3,
+aeadEncrypt/4,
+senderKey/3,
+responseAccepted/5;
+
+
+Facts:
+iknows/1, attack/0;
+
+
+Rules:
+
+iKnowAll(A: All)
+  => iknows(A);
+iNonce(X: untyped, Y: untyped, Z: untyped)
+  iknows(X).iknows(Y).iknows(Z) => iknows(nonce(X,Y,Z));
+
+iAAD(X: untyped, Y: untyped)
+ => iknows(aad(X, Y));
+
+iKnowReq(X: untyped, Y: untyped, Z: untyped, W: untyped)
+  iknows(req(X, Y, Z, W)) => iknows(X). iknows(Y). iknows(Z). iknows(W);
+iKnowRes(X: untyped, Y: untyped, Z: untyped, W: untyped)
+  iknows(res(X, Y, Z, W)) => iknows(X). iknows(Y). iknows(Z). iknows(W);
+
+iDecrypt(X: untyped, Y: untyped, Z: untyped, W: untyped)
+  iknows(aeadEncrypt(X,Y,Z,W)).iknows(Y).iknows(Z).iknows(W) => iknows(X);
+
+iKnowContext(A: All, B: All)
+  => iknows(senderID(A, B)).
+     iknows(senderID(B, A)).
+     iknows(contextID(A, B));
+
+ init(M: value)
+   =[M]=> iknows(M);
+
+ a2(M1: untyped, M2: untyped)
+   iknows(pair(M1,M2)) => iknows(M1).iknows(M2);
+
+ a3(M1: untyped, M2: untyped)
+   iknows(M1).iknows(M2) => iknows(pair(M1,M2));
+
+ iKnow(A:Honest, B:Honest, SSN: value)
+   =[SSN]=>
+   iknows(SSN).
+   SSN in securityContext(A, B, valid);
+
+iKnowDis(A:Honest, B:Dishon, SSN: value)
+  =[SSN]=>
+  iknows(SSN).
+  iknows(masterSecret(A,B)).
+  SSN in securityContext(A, B, valid);
+
+ iDeriveKeys(A: All, B: All)
+    iknows(masterSecret(A, B)).
+    iknows(contextID(A, B)). %actually we dont need this
+    iknows(senderID(A, B)).
+    iknows(senderID(B, A)).
+    =>
+    iknows(senderKey(masterSecret(A, B), contextID(A,B), senderID(A, B))).
+    iknows(senderKey(masterSecret(A, B), contextID(A,B), senderID(B, A))).
+    iknows(commonIV(masterSecret(A, B), contextID(A,B), emptyID));
+
+
+ iSendRequest(A: Honest, B: All, M:value, SSN: value, Token: value, MessageID: value)
+   SSN in securityContext(A, B, valid).
+   =[Token, MessageID]=>
+   SSN in securityContext(A, B, used).
+   iknows(
+     req(
+       Token,
+       MessageID,
+       pair(senderID(A,B), SSN),
+       aeadEncrypt(
+          hash(A, B),
+          aad(senderID(A, B), SSN),
+          senderKey(masterSecret(A, B), contextID(A,B), senderID(A, B)),
+          nonce(senderID(A, B), SSN, commonIV(masterSecret(A,B), contextID(A, B), emptyID))
+         )
+     ));
+
+ iSendResponse(B: All, A: Honest, M:value, SSN: value, Token: value, MessageID: value, Nonce: untyped)
+   =[MessageID]=>
+   iknows(
+     res(
+       Token,
+       MessageID, %For the response, we create a new message ID
+       emptyID,
+       aeadEncrypt(
+          hash(B, A), % And a new message payload
+          aad(senderID(A, B), SSN),
+          senderKey(masterSecret(A, B), contextID(A,B), senderID(B, A)),
+          nonce(senderID(A, B), SSN, commonIV(masterSecret(A,B), contextID(A, B), emptyID))
+         )
+     ));
+
+ iVerifyRequest(B: All, A: Honest, M: untyped, SSN: value, Token: value, MessageID: value)
+     iknows(
+       req(
+         Token,
+         MessageID,
+         pair(senderID(A,B), SSN),
+         aeadEncrypt(
+            M,
+            aad(senderID(A, B), SSN),
+            senderKey(masterSecret(A, B), contextID(A,B), senderID(A, B)),
+            nonce(senderID(A, B), SSN, commonIV(masterSecret(A,B), contextID(A, B), emptyID))
+           )
+       )).
+     iknows(M). %If he composed M, that must be because he got all the right aad, nonce, keys etc.
+     SSN notin securityContext(_,_, seen). %Replay window
+     =>
+     iknows(requestAccepted(Token, M, SSN, A, B)).
+     SSN in securityContext(A, B, seen);
+
+ iVerifyResponse(A:Honest, B: All, M:untyped, SSN: value, Token: value, MessageID: value)
+   iknows(
+     res(
+       Token,
+       MessageID, %For the response, we create a new message ID
+       emptyID,
+       aeadEncrypt(
+          M, % And a new message payload
+          aad(senderID(A, B), SSN),
+          senderKey(masterSecret(A, B), contextID(A,B), senderID(B, A)),
+          nonce(senderID(A, B), SSN, commonIV(masterSecret(A,B), contextID(A, B), emptyID))
+         )
+     )).
+     iknows(M).
+     Token in tokenRing(A).
+     =>
+     iknows(responseAccepted(Token, M, SSN, B, A));
+
+ secrecyReq(A: Honest, B: Honest, M:untyped, SSN: value, Token: value, MessageID: value)
+   iknows(
+     req(
+       Token,
+       MessageID,
+       pair(senderID(A,B), SSN),
+       aeadEncrypt(
+          M,
+          aad(senderID(A, B), SSN),
+          senderKey(masterSecret(A, B), contextID(A,B), senderID(A, B)),
+          nonce(senderID(A, B), SSN, commonIV(masterSecret(A,B), contextID(A, B), emptyID))
+         )
+     )).
+   iknows(requestAccepted(Token, M, SSN, A, B)).
+   => attack;
+
+ secrecyResp(A: Honest, B: Dishon, M:untyped, SSN: value, Token: value, MessageID: value)
+   iknows(
+     res(
+       Token,
+       MessageID, %For the response, we create a new message ID
+       emptyID,
+       aeadEncrypt(
+          M, % And a new message payload
+          aad(senderID(A, B), SSN),
+          senderKey(masterSecret(A, B), contextID(A,B), senderID(B, A)),
+          nonce(senderID(A, B), SSN, commonIV(masterSecret(A,B), contextID(A, B), emptyID))
+         )
+     )).
+   iknows(responseAccepted(Token, M, SSN, B, A)).
+   => attack;
+
+%This does not currently work...
+% reqReplay(A: Honest, B: Honest, M:value, M2: value, SSN: value, Token: value, MessageID: value)
+%     SSN in securityContext(A, B, seen).
+%     iknows(
+%       res(
+%         Token,
+%         MessageID, %For the response, we create a new message ID
+%         emptyID,
+%         aeadEncrypt(
+%           M, % And a new message payload
+%           aad(senderID(A, B), SSN),
+%           senderKey(masterSecret(A, B), contextID(A,B), senderID(A, B)),
+%           nonce(senderID(A, B), SSN, commonIV(masterSecret(A,B), contextID(A, B), emptyID))
+%          )
+%      )).
+%     iknows(
+%       res(
+%         Token,
+%         MessageID,
+%         emptyID,
+%         aeadEncrypt(
+%            M2,
+%            aad(senderID(A, B), SSN),
+%            senderKey(masterSecret(A, B), contextID(A,B), senderID(A, B)),
+%            nonce(senderID(A, B), SSN, commonIV(masterSecret(A,B), contextID(A, B), emptyID))
+%           )
+%       )).
+%     => attack;
+%
+% tokenAttack(A: Honest, B: Honest, M:value, M2:value, SSN: value, Token: value, MessageID: value)
+%   iknows(
+%     res(
+%       Token,
+%       MessageID,
+%       emptyID,
+%       aeadEncrypt(
+%          M,
+%          aad(senderID(A, B), SSN),
+%          senderKey(masterSecret(A, B), contextID(A,B), senderID(A, B)),
+%          nonce(senderID(A, B), SSN, commonIV(masterSecret(A,B), contextID(A, B), emptyID))
+%         )
+%     )).
+%   iknows(
+%     res(
+%       Token,
+%       MessageID,
+%       emptyID,
+%       aeadEncrypt(
+%          M,
+%          aad(senderID(A, B), SSN),
+%          senderKey(masterSecret(A, B), contextID(A,B), senderID(A, B)),
+%          nonce(senderID(A, B), SSN, commonIV(masterSecret(A,B), contextID(A, B), emptyID))
+%         )
+%     )).
+%   iknows(responseAccepted(Token, M2, SSN, A, B)).
+%   iknows(responseAccepted(Token, M, SSN, A, B)).
+%   => attack;
