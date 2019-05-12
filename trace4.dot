@@ -1,0 +1,222 @@
+digraph {
+graph [ordering = out]
+edge [arrowhead = none, penwidth = 1.6, fontsize = 30]
+node [shape = point, width = 0, height = 0, fontsize = 30]
+Trace<br/>
+[label = <A trace has been found.<br/>
+>, shape = plaintext]
+P0__0 [label = "Honest Process", shape = plaintext]
+P__0 [label = "Attacker", shape = plaintext]
+Trace -> P0__0 [label = "", style = invisible, weight = 100]{rank = same; P0__0 P__0}
+P0__0 -> P0__1 [label = <>, weight = 100]
+P0__1 -> P0__2 [label = <>, weight = 100]
+P__0 -> P__1 [label = <>, weight = 100]
+{rank = same; P__1 P0__2}
+P0__2 -> P0__3 [label = <>, weight = 100]
+P__1 -> P__2 [label = <>, weight = 100]
+{rank = same; P__2 P0__3}
+P0__3 -> P__2 [label = <a_111146>, dir = back, arrowhead = normal]
+P0__3 -> P0__4 [label = <>, weight = 100]
+P__2 -> P__3 [label = <>, weight = 100]
+{rank = same; P__3 P0__4}
+P0__4 -> P0__5 [label = <>, weight = 100]
+P__3 -> P__4 [label = <>, weight = 100]
+{rank = same; P__4 P0__5}
+P0__5 -> P0__6 [label = <>, weight = 100]
+P__4 -> P__5 [label = <>, weight = 100]
+{rank = same; P__5 P0__6}
+P0__6 -> P__5 [label = <a_111147>, dir = back, arrowhead = normal]
+P0__6 -> P0__7 [label = <>, weight = 100]
+P__5 -> P__6 [label = <>, weight = 100]
+{rank = same; P__6 P0__7}
+P0__7 -> P0__8 [label = <>, weight = 100]
+P__6 -> P__7 [label = <>, weight = 100]
+{rank = same; P__7 P0__8}
+P0__8 -> P0__9 [label = <>, weight = 100]
+P__7 -> P__8 [label = <>, weight = 100]
+{rank = same; P__8 P0__9}
+P0__9 -> P__8 [label = <a_111148>, dir = back, arrowhead = normal]
+P0__9 -> P0__10 [label = <>, weight = 100]
+P__8 -> P__9 [label = <>, weight = 100]
+{rank = same; P__9 P0__10}
+P0__10 -> P0__11 [label = <>, weight = 100]
+P0__11 [shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"> <TR><TD><FONT COLOR="darkgreen">{4}</FONT><FONT COLOR="blue">new </FONT>IDir_111155</TD></TR><TR><TD><FONT COLOR="darkgreen">{5}</FONT><FONT COLOR="blue">new </FONT>IDri_111154</TD></TR><TR><TD><FONT COLOR="darkgreen">{6}</FONT><FONT COLOR="blue">new </FONT>msecret_111156</TD></TR><TR><TD><FONT COLOR="darkgreen">{7}</FONT><FONT COLOR="blue">new </FONT>msalt_111157</TD></TR><TR><TD><FONT COLOR="darkgreen">{8}</FONT><FONT COLOR="blue">new </FONT>idcontext_111158</TD></TR></TABLE>>]
+P0__11 -> P0__12 [label = <>, weight = 100]
+P0__12 -> P0__13 [label = <>, weight = 100]
+P__9 -> P__10 [label = <>, weight = 100]
+{rank = same; P__10 P0__13}
+P0__13 -> P0__14 [label = <>, weight = 100]
+P__10 -> P__11 [label = <>, weight = 100]
+{rank = same; P__11 P0__14}
+P0__14 -> P__11 [label = <(~M_111424,~M_111425,~M_111426) = (IDir_111155,<br/>
+IDri_111154,idcontext_111158)>, arrowhead = normal]
+P0__14 -> P0__15 [label = <>, weight = 100]
+P__11 -> P__12 [label = <>, weight = 100]
+{rank = same; P__12 P0__15}
+P0__15 -> P0__16 [label = <>, weight = 100]
+P0__16 [shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"> <TR><TD><FONT COLOR="darkgreen">{10}</FONT><FONT COLOR="blue">insert </FONT>security_context_lookup(a_111146,a_111147,<br/>
+IDir_111155,IDri_111154,msecret_111156,msalt_111157,<br/>
+idcontext_111158)</TD></TR><TR><TD><FONT COLOR="darkgreen">{11}</FONT><FONT COLOR="blue">insert </FONT>security_context_lookup(a_111147,a_111146,<br/>
+IDri_111154,IDir_111155,msecret_111156,msalt_111157,<br/>
+idcontext_111158)</TD></TR></TABLE>>]
+P0__16 -> P0__17 [label = <>, weight = 100]
+P__12 -> P__13 [label = <>, weight = 100]
+{rank = same; P__13 P0__16}
+/*RPar */
+P0__17 -> P0_5__17 [label = <>]
+P0__17 -> P0_4__17 [label = <>]
+P0__17 -> P0_3__17 [label = <>]
+P0__17 -> P0_2__17 [label = <>]
+P0__17 -> P0_1__17 [label = <>]
+P0__17 -> P0_0__17 [label = <>]
+P0__17 [label = "", fixedsize = false, width = 0, height = 0, shape = none]
+{rank = same; P0_0__17 P0_1__17 P0_2__17 P0_3__17 P0_4__17 P0_5__17}
+P0_0__17 [label = "!", shape = ellipse]
+P0_1__17 [label = "!", shape = ellipse]
+P0_1_0__17 [label = "", fixedsize = false, width = 0, height = 0, shape = none]
+P0_1__17 -> P0_1_0__17 [label = <>, weight = 100]
+P0_1_0__17 -> P0_1_0__18 [label = <>, weight = 100]
+P0_1_0__18 [shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"> <TR><TD>Beginning of process <FONT COLOR="darkgreen">oscore_responder</FONT></TD></TR></TABLE>>]
+P0_1_0__18 -> P0_1_0__19 [label = <>, weight = 100]
+P0_2__17 [label = "!", shape = ellipse]
+P0_2_0__17 [label = "", fixedsize = false, width = 0, height = 0, shape = none]
+P0_2__17 -> P0_2_0__17 [label = <>, weight = 100]
+P0_2_0__17 -> P0_2_0__18 [label = <>, weight = 100]
+P0_2_0__18 [shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"> <TR><TD>Beginning of process <FONT COLOR="darkgreen">oscore_initiator</FONT></TD></TR></TABLE>>]
+P0_2_0__18 -> P0_2_0__19 [label = <>, weight = 100]
+P0_4__18 [label = "", width = 0.3, height = 0.3]
+P0_4__17 -> P0_4__18 [label = <>, weight = 100]
+P0_5__18 [label = "", width = 0.3, height = 0.3]
+P0_5__17 -> P0_5__18 [label = <>, weight = 100]
+P0_2_0__19 -> P0_2_0__20 [label = <>, weight = 100]
+P0_1_0__19 -> P0_1_0__20 [label = <>, weight = 100]
+P0_0__18 [label = "", style = invisible]
+P0_0__17 -> P0_0__18 [label = <>, weight = 100, style = invisible]
+P__13 -> P__14 [label = <>, weight = 100]
+{rank = same; P__14 P0_0__18 P0_1_0__20 P0_2_0__20}
+P0_2_0__20 -> P0_2_0__21 [label = <>, weight = 100]
+P__14 -> P__15 [label = <>, weight = 100]
+{rank = same; P__15 P0_2_0__21}
+P0_2_0__21 -> P__15 [label = <a_111146>, dir = back, arrowhead = normal]
+P0_2_0__21 -> P0_2_0__22 [label = <>, weight = 100]
+P0_1_0__20 -> P0_1_0__21 [label = <>, weight = 100]
+P0_0__19 [label = "", style = invisible]
+P0_0__18 -> P0_0__19 [label = <>, weight = 100, style = invisible]
+P__15 -> P__16 [label = <>, weight = 100]
+{rank = same; P__16 P0_0__19 P0_1_0__21 P0_2_0__22}
+P0_2_0__22 -> P0_2_0__23 [label = <>, weight = 100]
+P0_2_0__23 [shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"> <TR><TD><FONT COLOR="darkgreen">{20}</FONT><FONT COLOR="blue">new </FONT>token_111161</TD></TR><TR><TD><FONT COLOR="darkgreen">{21}</FONT><FONT COLOR="blue">new </FONT>messageid_111160</TD></TR><TR><TD><FONT COLOR="darkgreen">{22}</FONT><FONT COLOR="blue">new </FONT>partial_iv_111159</TD></TR></TABLE>>]
+P0_2_0__23 -> P0_2_0__24 [label = <>, weight = 100]
+P0_2_0__24 -> P0_2_0__25 [label = <>, weight = 100]
+P0_1_0__21 -> P0_1_0__22 [label = <>, weight = 100]
+P0_0__20 [label = "", style = invisible]
+P0_0__19 -> P0_0__20 [label = <>, weight = 100, style = invisible]
+P__16 -> P__17 [label = <>, weight = 100]
+{rank = same; P__17 P0_0__20 P0_1_0__22 P0_2_0__25}
+P0_2_0__25 -> P0_2_0__26 [label = <>, weight = 100]
+P__17 -> P__18 [label = <>, weight = 100]
+{rank = same; P__18 P0_2_0__26}
+P0_2_0__26 -> P__18 [label = <a_111147>, dir = back, arrowhead = normal]
+P0_2_0__26 -> P0_2_0__27 [label = <>, weight = 100]
+P0_1_0__22 -> P0_1_0__23 [label = <>, weight = 100]
+P0_0__21 [label = "", style = invisible]
+P0_0__20 -> P0_0__21 [label = <>, weight = 100, style = invisible]
+P__18 -> P__19 [label = <>, weight = 100]
+{rank = same; P__19 P0_0__21 P0_1_0__23 P0_2_0__27}
+P0_2_0__27 -> P0_2_0__28 [label = <>, weight = 100]
+P0_2_0__28 [shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"> <TR><TD><FONT COLOR="darkgreen">{39}</FONT><FONT COLOR="blue">get </FONT>security_context_lookup(a_111146,a_111147,<br/>
+IDir_111155,IDri_111154,msecret_111156,msalt_111157,<br/>
+idcontext_111158)</TD></TR><TR><TD><FONT COLOR="darkgreen">{34}</FONT><FONT COLOR="blue">insert </FONT>token_to_message_lookup(a_111146,token_111161,<br/>
+(a_111147,IDir_111155,IDri_111154,idcontext_111158,<br/>
+partial_iv_111159,aeadNonce(IDir_111155,partial_iv_111159,<br/>
+HKDF(msecret_111156,msalt_111157,(emptyId,idcontext_111158,<br/>
+AES_CCM,label_iv,alg_key_length(AES_CCM,label_iv))))))<br/>
+</TD></TR><TR><TD><FONT COLOR="darkgreen">{35}</FONT><FONT COLOR="blue">event</FONT> beginInitiator(a_111146,a_111147,(CoAP_GETCode,<br/>
+isLightBulbTurnedOn))</TD></TR><TR><TD><FONT COLOR="darkgreen">{37}</FONT><FONT COLOR="blue">event</FONT> integrityReq(CoAP_GETCode,isLightBulbTurnedOn,<br/>
+msg1(a_111146,a_111147))</TD></TR></TABLE>>]
+P0_2_0__28 -> P0_2_0__29 [label = <>, weight = 100]
+P__19 -> P__20 [label = <>, weight = 100]
+{rank = same; P__20 P0_2_0__28}
+P0_2_0__29 -> P0_2_0__30 [label = <>, weight = 100]
+P0_1_0__23 -> P0_1_0__24 [label = <>, weight = 100]
+P0_0__22 [label = "", style = invisible]
+P0_0__21 -> P0_0__22 [label = <>, weight = 100, style = invisible]
+P__20 -> P__21 [label = <>, weight = 100]
+{rank = same; P__21 P0_0__22 P0_1_0__24 P0_2_0__30}
+P0_2_0__30 -> P0_2_0__31 [label = <>, weight = 100]
+P__21 -> P__22 [label = <>, weight = 100]
+{rank = same; P__22 P0_2_0__31}
+P0_2_0__31 -> P__22 [label = <(~M_111593,~M_111594,~M_111595,~M_111596,(~M_111599,<br/>
+~M_111600,~M_111601),~M_111598)>, arrowhead = normal]
+P0_2_0__31 -> P0_2_0__32 [label = <>, weight = 100]
+P0_1_0__24 -> P0_1_0__25 [label = <>, weight = 100]
+P0_0__23 [label = "", style = invisible]
+P0_0__22 -> P0_0__23 [label = <>, weight = 100, style = invisible]
+P__22 -> P__23 [label = <>, weight = 100]
+{rank = same; P__23 P0_0__23 P0_1_0__25 P0_2_0__32}
+P0_2_0__33 [label = "", width = 0.3, height = 0.3]
+P0_2_0__32 -> P0_2_0__33 [label = <>, weight = 100]
+P0_1_0__25 -> P0_1_0__26 [label = <>, weight = 100]
+P0_0__24 [label = "", style = invisible]
+P0_0__23 -> P0_0__24 [label = <>, weight = 100, style = invisible]
+P__23 -> P__24 [label = <>, weight = 100]
+{rank = same; P__24 P0_0__24 P0_1_0__26}
+P0_1_0__26 -> P0_1_0__27 [label = <>, weight = 100]
+P__24 -> P__25 [label = <>, weight = 100]
+{rank = same; P__25 P0_1_0__27}
+P0_1_0__27 -> P__25 [label = <a_111147>, dir = back, arrowhead = normal]
+P0_1_0__27 -> P0_1_0__28 [label = <>, weight = 100]
+P0_0__25 [label = "", style = invisible]
+P0_0__24 -> P0_0__25 [label = <>, weight = 100, style = invisible]
+P__25 -> P__26 [label = <>, weight = 100]
+{rank = same; P__26 P0_0__25 P0_1_0__28}
+P0_1_0__28 -> P0_1_0__29 [label = <>, weight = 100]
+P0_0__26 [label = "", style = invisible]
+P0_0__25 -> P0_0__26 [label = <>, weight = 100, style = invisible]
+P__26 -> P__27 [label = <>, weight = 100]
+{rank = same; P__27 P0_0__26 P0_1_0__29}
+P0_1_0__29 -> P0_1_0__30 [label = <>, weight = 100]
+P__27 -> P__28 [label = <>, weight = 100]
+{rank = same; P__28 P0_1_0__30}
+P0_1_0__30 -> P__28 [label = <~X_1>, dir = back, arrowhead = normal]
+P0_1_0__30 -> P0_1_0__31 [label = <>, weight = 100]
+P0_0__27 [label = "", style = invisible]
+P0_0__26 -> P0_0__27 [label = <>, weight = 100, style = invisible]
+P__28 -> P__29 [label = <>, weight = 100]
+{rank = same; P__29 P0_0__27 P0_1_0__31}
+P0_1_0__31 -> P0_1_0__32 [label = <>, weight = 100]
+P0_1_0__32 [shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"> <TR><TD><FONT COLOR="darkgreen">{64}</FONT><FONT COLOR="blue">get </FONT>security_context_lookup(a_111147,a_111146,<br/>
+IDri_111154,IDir_111155,msecret_111156,msalt_111157,<br/>
+idcontext_111158)</TD></TR><TR><TD><FONT COLOR="darkgreen">{63}</FONT><FONT COLOR="blue">get</FONT> replay_window(=a_111147,partial_111787:<br/>
+bitstring) <FONT COLOR="blue">suchthat</FONT> (partial_111787 = partial_iv_111159):<br/>
+else branch taken</TD></TR><TR><TD><FONT COLOR="darkgreen">{52}</FONT><FONT COLOR="blue">event</FONT> integrityReq(CoAP_GETCode,isLightBulbTurnedOn,<br/>
+msg1(a_111146,a_111147))</TD></TR><TR><TD><FONT COLOR="darkgreen">{53}</FONT><FONT COLOR="blue">insert </FONT>replay_window(a_111147,partial_iv_111159)<br/>
+</TD></TR><TR><TD><FONT COLOR="darkgreen">{54}</FONT><FONT COLOR="blue">new </FONT>responseId_111824</TD></TR></TABLE>>]
+P0_1_0__32 -> P0_1_0__33 [label = <>, weight = 100]
+P__29 -> P__30 [label = <>, weight = 100]
+{rank = same; P__30 P0_1_0__32}
+P0_1_0__33 -> P0_1_0__34 [label = <>, weight = 100]
+P0_1_0__34 [color = red, shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"> <TR><TD><FONT COLOR="darkgreen">{60}</FONT><FONT COLOR="blue">event</FONT> endResponder(a_111146,a_111147,(CoAP_GETCode,<br/>
+isLightBulbTurnedOn))</TD></TR></TABLE>>]
+P0_1_0__34 -> P0_1_0__35 [label = <>, weight = 100]
+Abbrev [shape = plaintext, label = <<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR> <TD> Abbreviations </TD></TR><TR><TD>~M_111593 = non_confirmable</TD></TR><TR><TD>~M_111594 = CoAP_POSTCode</TD></TR><TR><TD>~M_111595 = messageid_111160</TD></TR><TR><TD>~M_111596 = token_111161</TD></TR><TR><TD>~M_111599 = partial_iv_111159</TD></TR><TR><TD>~M_111600 = IDir_111155</TD></TR><TR><TD>~M_111601 = idcontext_111158</TD></TR><TR><TD>~M_111598 = aeadEncrypt(HKDF(msecret_111156,msalt_111157,<br/>
+(IDir_111155,idcontext_111158,AES_CCM,label_key,<br/>
+alg_key_length(AES_CCM,label_key))),aeadNonce(<br/>
+IDir_111155,partial_iv_111159,HKDF(msecret_111156,<br/>
+msalt_111157,(emptyId,idcontext_111158,AES_CCM,<br/>
+label_iv,alg_key_length(AES_CCM,label_iv)))),(<br/>
+(CoAP_GETCode,isLightBulbTurnedOn),msg1(a_111146,<br/>
+a_111147)),(encrypt0,oscore_version_one,AES_CCM,<br/>
+IDir_111155,partial_iv_111159))</TD></TR><TR><TD>~X_1 = (a_111149,a_111150,a_111151,a_111152,(~M_111599,<br/>
+~M_111424,~M_111426),~M_111598)<br/>
+= (a_111149,a_111150,<br/>
+a_111151,a_111152,(partial_iv_111159,IDir_111155,<br/>
+idcontext_111158),aeadEncrypt(HKDF(msecret_111156,<br/>
+msalt_111157,(IDir_111155,idcontext_111158,AES_CCM,<br/>
+label_key,alg_key_length(AES_CCM,label_key))),<br/>
+aeadNonce(IDir_111155,partial_iv_111159,HKDF(msecret_111156,<br/>
+msalt_111157,(emptyId,idcontext_111158,AES_CCM,<br/>
+label_iv,alg_key_length(AES_CCM,label_iv)))),(<br/>
+(CoAP_GETCode,isLightBulbTurnedOn),msg1(a_111146,<br/>
+a_111147)),(encrypt0,oscore_version_one,AES_CCM,<br/>
+IDir_111155,partial_iv_111159)))</TD></TR></TABLE>>]Abbrev -> P__0 [style = invisible, weight =100]}

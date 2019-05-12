@@ -62,6 +62,8 @@ table used_tokens(host, bitstring).
 fun msg1(host, host): bitstring[private].
 fun msg2(host, host): bitstring[private].
 
+event integrityReq(bitstring, bitstring, bitstring).
+event integrityReqRes(bitstring, bitstring, bitstring).
 event beginInitiator(host, host, bitstring).
 event beginResponder(host, host, bitstring).
 event here.
@@ -72,17 +74,16 @@ event match(bitstring, bitstring).
 
 event dishonest(host).
 
-(*Assertion that each query is reachable*)
-(*)
-query init:host, res: host, payload: bitstring; inj-event(beginResponder(init,res,(CoAP_CONTENTCode,bounded_by(payload)))) ==>  event (dishonest(init)) || event (dishonest(res)).
-query init:host, res: host, payload: bitstring; inj-event(beginInitiator(init, res, payload)) ==>  event (dishonest(init)) || event (dishonest(res)).
-query init:host, res:host, payload: bitstring; inj-event(endResponder(init, res, payload)) ==>  event (dishonest(init)) || event (dishonest(res)).
-query init:host, res:host, payload: bitstring; inj-event(endInitiator(init, res, payload)) ==>  event (dishonest(init)) || event (dishonest(res)).
+(*TEST SUITE: Each query is reachable*)
+(*
+query init:host, res: host; event(here) ==> event (dishonest(init)) || event (dishonest(res)).
+query init:host, res: host, payload: bitstring; event(beginResponder(init,res, bounded_by(payload))) ==>  event (dishonest(init)) || event (dishonest(res)).
+query init:host, res: host, payload: bitstring; event(beginInitiator(init, res, payload)) ==>  event (dishonest(init)) || event (dishonest(res)).
+query init:host, res:host, payload: bitstring; event(endResponder(init, res, payload)) ==>  event (dishonest(init)) || event (dishonest(res)).
+query init:host, res:host, payload: bitstring; event(endInitiator(init, res, payload)) ==>  event (dishonest(init)) || event (dishonest(res)).
 *)
-
-
 (*Request response*)
-query init:host, res:host, payload: bitstring,  t: bitstring; inj-event(endInitiator(init, res, bounded_by(payload))) ==> (inj-event(beginResponder(init, res, bounded_by(payload))) ==> inj-event(beginInitiator(init, res, payload)))  || event (dishonest(init)) || event (dishonest(res)).
+query init:host, res:host, payload: bitstring; inj-event(endInitiator(init, res, bounded_by(payload))) ==> (inj-event(beginResponder(init, res, bounded_by(payload))) ==> inj-event(beginInitiator(init, res, payload)))  || event (dishonest(init)) || event (dishonest(res)).
 
 (*Injective agreement*)
 query init:host, res:host, payload: bitstring; inj-event(endResponder(init, res, payload)) ==> inj-event(beginInitiator(init, res, payload)) || event (dishonest(init)) || event (dishonest(res)).
@@ -128,15 +129,16 @@ let oscore_initiator_response_receiver =
   in(c, identity:host);
   in(c, (T:bitstring, dummyCode : bitstring, messageid : bitstring, token: bitstring, OSCORE:bitstring, ciphertext:bitstring)); (*The encrypted payload*)
   if OSCORE = empty then
-  get token_to_message_lookup(=identity, =token, security_context:bitstring) in
+  get token_to_message_lookup(=identity, =T, security_context:bitstring) in
   let (endpoint:host, senderID:id, recipientID:id, idcontext:bitstring, partial_iv:bitstring, aead_nonce:nonce) = security_context in
   get security_context_lookup(=identity, =endpoint, =senderID, =recipientID, msecret:bitstring, msalt:bitstring, =idcontext) in (*Find a security context with endpoint*)
   let aad = (encrypt0, oscore_version_one, AES_CCM, senderID, partial_iv) in
   let recipientInfo = (recipientID, idcontext, AES_CCM, label_key, alg_key_length(AES_CCM, label_key)) in let recipientKey = HKDF(msecret, msalt, recipientInfo) in
   let (plaintext:bitstring, identifier:bitstring) = aeadDecrypt(ciphertext, recipientKey, aead_nonce, aad) in
   let (code: bitstring, payload: bitstring) = plaintext in
-  get used_tokens(=identity, acceptedT) suchthat acceptedT = T in 0 else
-  insert used_tokens(identity, token);
+  event integrityReqRes(code, payload, identifier);
+  get used_tokens(=identity, acceptedT : bitstring) suchthat acceptedT = T in 0 else
+  insert used_tokens(identity, T);
   event match(token, plaintext);
   event endInitiator(identity, endpoint, payload);
   event here.
@@ -153,6 +155,7 @@ let oscore_responder =
 
   get replay_window(=identity, partial : bitstring) suchthat partial = partial_iv in 0 else
   let (plaintextreceived:bitstring, identifier:bitstring) = aeadDecrypt(ciphertext, recipientKey, aead_nonce, aad) in
+  let (rcode:bitstring, payload: bitstring) = plaintextreceived in
   insert replay_window(identity, partial_iv);
   new responseId : bitstring;
   let responsePayload = bounded_by(plaintextreceived) in (*Response payload is bounded by the plaintext*)
@@ -161,12 +164,13 @@ let oscore_responder =
   let msg_2 = (non_confirmable, CoAP_CHANGEDCode, responseId, token, empty, sender_ciphertext) in
   event endResponder(endpoint, identity, plaintextreceived);
   event beginResponder(endpoint, identity, responsePayload);
+  event integrityReq(CoAP_CONTENTCode, responsePayload, msg2(identity, endpoint));
   out(c, msg_2).
 
 let init_keys =
     in(c, initiator: host);
     in(c, responder: host);
-    in(c, dishonesth: host);
+    if initiator <> responder then
     new IDir:id; new IDri:id;
     new msecret: bitstring; new msalt: bitstring; new idcontext: bitstring;
     out(c, (IDir, IDri, idcontext));
@@ -179,7 +183,20 @@ let init_keys =
     (phase 1; out(c, (msecret, msalt))).
 
 process
-    (!init_keys) |
+    in(c, initiator: host);
+    in(c, responder: host);
+    in(c, dishonesth: host);
+    new IDir:id; new IDri:id;
+    new msecret: bitstring; new msalt: bitstring; new idcontext: bitstring;
+    out(c, (IDir, IDri, idcontext));
+    insert security_context_lookup(initiator, responder, IDir, IDri, msecret, msalt, idcontext);
+    insert security_context_lookup(responder, initiator, IDri, IDir, msecret, msalt, idcontext);
+    (event dishonest(initiator);
+      out(c, (msecret, msalt))) |
+    (event dishonest(responder);
+      out(c, (msecret, msalt))) |
+    (phase 1; out(c, (msecret, msalt)))
+    |
     (!oscore_initiator) |
     (!oscore_responder) |
     (!oscore_initiator_response_receiver)
