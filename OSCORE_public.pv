@@ -196,6 +196,7 @@ process
       out(c, (msecret, msalt))) |
     (phase 1; out(c, (msecret, msalt)))
     |
+	(*(!init_keys) | *)
     (!oscore_initiator) |
     (!oscore_responder) |
     (!oscore_initiator_response_receiver)
