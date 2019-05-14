@@ -185,7 +185,6 @@ let init_keys =
 process
     in(c, initiator: host);
     in(c, responder: host);
-    in(c, dishonesth: host);
     new IDir:id; new IDri:id;
     new msecret: bitstring; new msalt: bitstring; new idcontext: bitstring;
     out(c, (IDir, IDri, idcontext));
