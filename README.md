@@ -1,6 +1,5 @@
 # OSCOREProverif
 This is the ProVerif model developed in association with the formal verification of OSCORE.
-CBOR
  -
   - OSCORE uses untagged COSE_Encrypt0 structure, with AEAD.
   - Plaintext denotes the data that is to be encrypted and integrity protected. 
