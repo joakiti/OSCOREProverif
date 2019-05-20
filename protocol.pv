@@ -42,6 +42,7 @@ const HKDF_256: bitstring.
 fun HKDF(bitstring, bitstring, bitstring, bitstring): key.
 fun alg_key_length(bitstring, bitstring): bitstring.
 fun bounded_by(bitstring):bitstring.
+reduc forall b: bitstring, c: bitstring; contains(bounded_by(b)) = b.
 fun aeadEncrypt(key, nonce, bitstring, bitstring): bitstring.
 
 fun aeadNonce(id, bitstring, key) : nonce.
@@ -110,8 +111,6 @@ let step_1(identity: host, endpoint:host) =
   new partial_ivReq: bitstring;
   new R3: bitstring;
   let R2_R3 = bounded_by((R2, R3)) in
-  let cvInfoRes = (emptyId, R2_R3, AES_CCM, label_iv) in let CommonIvRes = HKDF(msecret, msalt, cvInfoRes, alg_key_length(AES_CCM, label_iv)) in
-  let senderInfo = (senderID, R2_R3, AES_CCM, label_key) in let senderKey = HKDF(msecret, msalt, senderInfo, alg_key_length(AES_CCM, label_key)) in
   let aadReq = (encrypt0, oscore_version_one, AES_CCM, senderID, partial_ivReq) in
   let aead_nonceRes = aeadNonce(senderID, partial_ivReq, CommonIv) in
   let plaintext = CoAP_CONTEXTCode in
@@ -122,6 +121,7 @@ let step_1(identity: host, endpoint:host) =
   let msg_4 = (non_confirmable, CoAP_POSTCode, messageidReq, tokenReq, oscore_option, ciphertextReq) in
   insert step_3_context(identity, endpoint, R2_R3);
   out(c, msg_4);
+
   in(c, (T:bitstring, dummyCode : bitstring, messageid : bitstring, token: bitstring, ciphertext:bitstring));
   get step_3_context(=identity, =endpoint, R2_R3: bitstring) in
   get token_to_message_lookup(=identity, =token, security_context: bitstring) in
@@ -131,7 +131,6 @@ let step_1(identity: host, endpoint:host) =
   let cvInfoRes = (emptyId, R2_R3, AES_CCM, label_iv) in let CommonIvRes = HKDF(msecret, msalt, cvInfoRes, alg_key_length(AES_CCM, label_iv)) in
   let senderInfoRes = (recipientID, R2_R3, AES_CCM, label_key) in let senderKeyRes = HKDF(msecret, msalt, senderInfoRes, alg_key_length(AES_CCM, label_key)) in
   let (plaintextreceived:bitstring) = aeadDecrypt(ciphertext, senderKeyRes, aead_nonceRes, aadReq) in
-  event here;
   insert new_security_context_lookup(identity, endpoint, senderID, recipientID, msecret, msalt, R2_R3).
 
 let step_2(identity: host) =
@@ -154,16 +153,19 @@ let step_2(identity: host) =
   let oscore_option = (R2) in
   let msg_2 = (non_confirmable, CoAP_POSTCode, responseID, token, oscore_option, ciphertextRes) in
   out(c, msg_2);
+
   in(c, (T:bitstring, dummyCode : bitstring, messageid : bitstring, token: bitstring, OSCORE:bitstring, ciphertext:bitstring));
   let (partial_iv:bitstring, recipientID:id, ID3:bitstring) = OSCORE in
+  let (=R2, R3: bitstring) = contains(ID3) in
   get security_context_lookup(=identity, endpoint:host, senderID:id, =recipientID, msecret:bitstring, msalt:bitstring, useless:bitstring) in
   let cvInfoRes = (emptyId, ID3, AES_CCM, label_iv) in let CommonIvRes = HKDF(msecret, msalt, cvInfoRes, alg_key_length(AES_CCM, label_iv)) in
   let senderInfo = (recipientID, ID3, AES_CCM, label_key) in let recipientKey = HKDF(msecret, msalt, senderInfo, alg_key_length(AES_CCM, label_key)) in
   let aad = (encrypt0, oscore_version_one, AES_CCM, recipientID, partial_iv) in
   let aead_nonce = aeadNonce(recipientID, partial_iv, CommonIvRes) in
   let (plaintextreceived:bitstring) = aeadDecrypt(ciphertext, recipientKey, aead_nonce, aad) in
-  insert new_security_context_lookup(identity, endpoint, senderID, recipientID, msecret, msalt, ID3);
+
   event here;
+  insert new_security_context_lookup(identity, endpoint, senderID, recipientID, msecret, msalt, ID3);
   new responseID: bitstring;
   let senderInfoRes = (senderID, ID3, AES_CCM, label_key) in let senderKeyRes = HKDF(msecret, msalt, senderInfoRes, alg_key_length(AES_CCM, label_key)) in
   let plaintext = CoAP_CONTEXTCode in
